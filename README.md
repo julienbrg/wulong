@@ -180,7 +180,7 @@ pnpm test
 
 ## License
 
-See [LICENSE](LICENSE) file.
+GPL-3.0
 
 ## Contact
 
