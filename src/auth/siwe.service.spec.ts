@@ -173,4 +173,34 @@ describe('SiweService', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('cleanExpiredNonces', () => {
+    it('should clean up expired nonces when generating new nonce', () => {
+      // Generate a nonce
+      const nonce1 = service.generateNonce();
+
+      // Access the internal nonces map to manipulate it
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const nonces = (service as any).nonces as Map<
+        string,
+        { nonce: string; createdAt: number }
+      >;
+
+      // Manually set the nonce as expired (> 5 minutes old)
+      const expiredEntry = nonces.get(nonce1);
+      if (expiredEntry) {
+        expiredEntry.createdAt = Date.now() - 6 * 60 * 1000; // 6 minutes ago
+      }
+
+      // Verify the expired nonce is still in the map
+      expect(nonces.has(nonce1)).toBe(true);
+
+      // Generate a new nonce, which should trigger cleanup
+      const nonce2 = service.generateNonce();
+
+      // The expired nonce should now be removed
+      expect(nonces.has(nonce1)).toBe(false);
+      expect(nonces.has(nonce2)).toBe(true);
+    });
+  });
 });
