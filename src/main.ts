@@ -1,5 +1,7 @@
 import * as fs from 'fs';
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { SanitizedLogger } from './logging/sanitized-logger';
 import { TeeExceptionFilter } from './filters/tee-exception.filter';
@@ -24,8 +26,35 @@ async function bootstrap() {
     logger: isProd ? new SanitizedLogger() : undefined,
   });
 
+  // Security headers - protects against common web vulnerabilities
+  app.use(helmet());
+
+  // CORS configuration - restrict to trusted origins in production
+  app.enableCors({
+    origin: isProd ? false : '*', // Disable CORS in production by default
+    credentials: true,
+  });
+
+  // Global validation pipe - validates all incoming requests
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // Strip properties that don't have decorators
+      forbidNonWhitelisted: true, // Throw error if non-whitelisted properties exist
+      transform: true, // Transform payloads to DTO instances
+    }),
+  );
+
+  // Global exception filter - sanitizes all error responses
   app.useGlobalFilters(new TeeExceptionFilter());
 
-  await app.listen(isProd ? 443 : 3000);
+  // Graceful shutdown handling
+  app.enableShutdownHooks();
+
+  const port = isProd ? 443 : 3000;
+  await app.listen(port);
+
+  // Log startup only in dev mode (production logger filters this out)
+  console.log(`Application is running on: https://localhost:${port}`);
 }
+
 bootstrap();

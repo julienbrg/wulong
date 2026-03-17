@@ -1,13 +1,32 @@
 import {
-  ExceptionFilter, Catch, ArgumentsHost,
-  HttpException, HttpStatus,
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 
-// Sanitize all error responses — never leak stack traces,
-// internal state, or user-supplied data back to the client.
+/**
+ * Global exception filter for TEE environments.
+ *
+ * Sanitizes all error responses to prevent information leakage.
+ * Never exposes:
+ * - Stack traces (can contain variable values)
+ * - Internal state or implementation details
+ * - User-supplied data that might be echoed back
+ * - Database errors or query information
+ *
+ * This is critical for TEE security as error details could reveal
+ * information about the enclave's internal state or data being processed.
+ */
 @Catch()
 export class TeeExceptionFilter implements ExceptionFilter {
-  catch(exception: unknown, host: ArgumentsHost) {
+  /**
+   * Catches and sanitizes all exceptions before sending responses.
+   * @param exception The exception that was thrown
+   * @param host The arguments host containing request/response context
+   */
+  catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
 
