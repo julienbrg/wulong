@@ -36,8 +36,8 @@ export class AttestationController {
     status: 500,
     description: 'Failed to generate attestation report',
   })
-  async getAttestation() {
-    const attestation = await this.teePlatform.generateAttestationReport();
+  getAttestation() {
+    const attestation = this.teePlatform.generateAttestationReport();
 
     return {
       ...attestation,

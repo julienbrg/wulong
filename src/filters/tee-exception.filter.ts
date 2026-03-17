@@ -28,7 +28,11 @@ export class TeeExceptionFilter implements ExceptionFilter {
    */
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse();
+    const response = ctx.getResponse<{
+      status: (code: number) => {
+        json: (body: { statusCode: number; message: string }) => void;
+      };
+    }>();
 
     const status =
       exception instanceof HttpException
@@ -40,7 +44,9 @@ export class TeeExceptionFilter implements ExceptionFilter {
       message:
         status === 500
           ? 'Internal server error'
-          : (exception as HttpException).message,
+          : exception instanceof HttpException
+            ? exception.message
+            : 'Internal server error',
       // No stack. No request echo. No internal details.
     });
   }

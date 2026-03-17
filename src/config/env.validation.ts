@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsString, IsUrl, validateSync } from 'class-validator';
+import { IsEnum, IsUrl, validateSync } from 'class-validator';
 
 /**
  * Environment configuration schema.

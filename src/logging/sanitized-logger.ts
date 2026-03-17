@@ -57,14 +57,14 @@ export class SanitizedLogger implements LoggerService {
   /**
    * Debug logging is completely suppressed in production TEE environments.
    */
-  debug(_message: string, _context?: string): void {
+  debug(): void {
     /* suppress in production */
   }
 
   /**
    * Verbose logging is completely suppressed in production TEE environments.
    */
-  verbose(_message: string, _context?: string): void {
+  verbose(): void {
     /* suppress in production */
   }
 

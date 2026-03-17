@@ -57,9 +57,7 @@ export class TeePlatformService {
   /**
    * Generates an attestation report for the current platform.
    */
-  async generateAttestationReport(
-    userData?: Buffer,
-  ): Promise<AttestationReport> {
+  generateAttestationReport(userData?: Buffer): AttestationReport {
     const timestamp = new Date().toISOString();
 
     switch (this.platform) {
@@ -77,10 +75,10 @@ export class TeePlatformService {
   /**
    * AMD SEV-SNP attestation using /dev/sev-guest device
    */
-  private async generateSevSnpAttestation(
+  private generateSevSnpAttestation(
     userData?: Buffer,
     timestamp?: string,
-  ): Promise<AttestationReport> {
+  ): AttestationReport {
     try {
       // In production, you would use sev-guest tools or a proper library
       // Example: snpguest report --random attestation.bin
@@ -110,19 +108,21 @@ export class TeePlatformService {
       };
     } catch (error) {
       this.logger.error(
-        `Failed to generate SEV-SNP attestation: ${error.message}`,
+        `Failed to generate SEV-SNP attestation: ${error instanceof Error ? error.message : String(error)}`,
       );
-      throw new Error('SEV-SNP attestation generation failed');
+      throw new Error('SEV-SNP attestation generation failed', {
+        cause: error,
+      });
     }
   }
 
   /**
    * Intel TDX attestation using tdx-guest tools
    */
-  private async generateTdxAttestation(
+  private generateTdxAttestation(
     userData?: Buffer,
     timestamp?: string,
-  ): Promise<AttestationReport> {
+  ): AttestationReport {
     try {
       const reportPath = '/tmp/tdx-quote.dat';
       const reportDataPath = '/tmp/tdx-report-data.bin';
@@ -163,19 +163,19 @@ export class TeePlatformService {
       };
     } catch (error) {
       this.logger.error(
-        `Failed to generate TDX attestation: ${error.message}`,
+        `Failed to generate TDX attestation: ${error instanceof Error ? error.message : String(error)}`,
       );
-      throw new Error('TDX attestation generation failed');
+      throw new Error('TDX attestation generation failed', { cause: error });
     }
   }
 
   /**
    * AWS Nitro Enclaves attestation using NSM device
    */
-  private async generateNitroAttestation(
+  private generateNitroAttestation(
     userData?: Buffer,
     timestamp?: string,
-  ): Promise<AttestationReport> {
+  ): AttestationReport {
     try {
       // In production, you'd use nsm-lib or nsm-api bindings
       // For now, we'll use the nitro-cli tool
@@ -187,10 +187,9 @@ export class TeePlatformService {
       const nonceHex = nonce.toString('hex');
 
       // Execute nsm-cli or similar tool
-      execSync(
-        `nitro-cli describe-enclaves | jq -r '.[0].Measurements.PCR0'`,
-        { stdio: 'pipe' },
-      );
+      execSync(`nitro-cli describe-enclaves | jq -r '.[0].Measurements.PCR0'`, {
+        stdio: 'pipe',
+      });
 
       // For production, use proper NSM API:
       // const attestation = await nsmApi.attestation({
@@ -234,21 +233,17 @@ export class TeePlatformService {
       };
     } catch (error) {
       this.logger.error(
-        `Failed to generate Nitro attestation: ${error.message}`,
+        `Failed to generate Nitro attestation: ${error instanceof Error ? error.message : String(error)}`,
       );
-      throw new Error('Nitro attestation generation failed');
+      throw new Error('Nitro attestation generation failed', { cause: error });
     }
   }
 
   /**
    * Mock attestation for development/testing (non-TEE environment)
    */
-  private async generateMockAttestation(
-    timestamp?: string,
-  ): Promise<AttestationReport> {
-    this.logger.warn(
-      'Generating MOCK attestation - DO NOT USE IN PRODUCTION',
-    );
+  private generateMockAttestation(timestamp?: string): AttestationReport {
+    this.logger.warn('Generating MOCK attestation - DO NOT USE IN PRODUCTION');
 
     return {
       platform: 'none',
