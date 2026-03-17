@@ -23,7 +23,7 @@ export function validateEnvironment(config: Record<string, unknown>) {
   });
 
   const errors = validateSync(validatedConfig, {
-    skipMissingProperties: false,
+    skipMissingProperties: true,
   });
 
   if (errors.length > 0) {
