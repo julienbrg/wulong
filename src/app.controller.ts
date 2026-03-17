@@ -1,7 +1,6 @@
-import { Controller, Post, Body, HttpCode } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { VerifyRequestDto } from './auth/dto/verify-request.dto';
-import { SiweService } from './auth/siwe.service';
+import { Controller, Post, HttpCode, UseGuards, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
+import { SiweGuard } from './auth/siwe.guard';
 
 /**
  * Main application controller.
@@ -10,38 +9,47 @@ import { SiweService } from './auth/siwe.service';
 @ApiTags('App')
 @Controller()
 export class AppController {
-  constructor(private readonly siweService: SiweService) {}
-
   @Post('hello')
   @HttpCode(200)
+  @UseGuards(SiweGuard)
   @ApiOperation({
-    summary: 'Verify SIWE signature and authenticate',
+    summary: 'Protected endpoint requiring SIWE authentication',
     description:
-      'Verifies the SIWE message and signature. Returns true if valid, false otherwise. ' +
-      'The nonce must be obtained from /auth/nonce and used within 5 minutes.',
+      'Returns a greeting with the authenticated Ethereum address. ' +
+      'Requires SIWE authentication via headers.',
+  })
+  @ApiHeader({
+    name: 'x-siwe-message',
+    description: 'The SIWE message string',
+    required: true,
+  })
+  @ApiHeader({
+    name: 'x-siwe-signature',
+    description: 'The signature hex string',
+    required: true,
   })
   @ApiResponse({
     status: 200,
-    description: 'Signature verification result',
+    description: 'Authentication successful',
     schema: {
       type: 'object',
       properties: {
-        success: { type: 'boolean' },
-        address: { type: 'string', nullable: true },
+        message: { type: 'string' },
+        address: { type: 'string' },
       },
     },
   })
-  async hello(
-    @Body() verifyDto: VerifyRequestDto,
-  ): Promise<{ success: boolean; address: string | null }> {
-    const address = await this.siweService.verifySignature(
-      verifyDto.message,
-      verifyDto.signature,
-    );
-
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing SIWE authentication',
+  })
+  hello(@Request() req: { user: { address: string } }): {
+    message: string;
+    address: string;
+  } {
     return {
-      success: address !== null,
-      address,
+      message: 'Hello, authenticated user!',
+      address: req.user.address,
     };
   }
 }

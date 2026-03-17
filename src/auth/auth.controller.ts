@@ -1,8 +1,7 @@
-import { Controller, Post, Body, HttpCode } from '@nestjs/common';
+import { Controller, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SiweService } from './siwe.service';
 import { NonceResponseDto } from './dto/nonce-response.dto';
-import { VerifyRequestDto } from './dto/verify-request.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -30,39 +29,6 @@ export class AuthController {
       nonce,
       issuedAt,
       expiresAt,
-    };
-  }
-
-  @Post('verify')
-  @HttpCode(200)
-  @ApiOperation({
-    summary: 'Verify SIWE signature and authenticate',
-    description:
-      'Verifies the SIWE message and signature. Returns true if valid, false otherwise. ' +
-      'The nonce must be obtained from /auth/nonce and used within 5 minutes.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Signature verification result',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        address: { type: 'string', nullable: true },
-      },
-    },
-  })
-  async verify(
-    @Body() verifyDto: VerifyRequestDto,
-  ): Promise<{ success: boolean; address: string | null }> {
-    const address = await this.siweService.verifySignature(
-      verifyDto.message,
-      verifyDto.signature,
-    );
-
-    return {
-      success: address !== null,
-      address,
     };
   }
 }

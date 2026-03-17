@@ -167,18 +167,16 @@ Full API documentation is available via Swagger UI at `https://localhost:3000` (
 
 ### Authentication
 
-**Sign-In with Ethereum (SIWE)** - Stateless Web3 authentication
+**Sign-In with Ethereum (SIWE)** - Guard-based Web3 authentication
 
 - `POST /auth/nonce` - Generate a cryptographically secure nonce for SIWE authentication
   - Returns nonce with 5-minute expiration
   - Single-use nonces (consumed after verification)
 
-- `POST /auth/verify` - Verify SIWE message and signature
-  - Validates signature against SIWE message
-  - Checks nonce validity and expiration
-  - Returns verified Ethereum address on success
-
-- `POST /hello` - Legacy verify endpoint (same functionality as `/auth/verify`)
+- Protected endpoints use `SiweGuard` for authentication
+  - Credentials passed via `x-siwe-message` and `x-siwe-signature` headers
+  - Guard validates signature, checks nonce, and attaches address to request
+  - Returns 401 Unauthorized if validation fails
 
 **Example Flow:**
 ```bash
@@ -187,11 +185,17 @@ curl -X POST https://localhost:3000/auth/nonce
 
 # 2. Sign SIWE message with your wallet (using w3pk, MetaMask, etc.)
 
-# 3. Verify signature
-curl -X POST https://localhost:3000/auth/verify \
-  -H "Content-Type: application/json" \
-  -d '{"message": "...SIWE message...", "signature": "0x..."}'
+# 3. Access protected endpoint with authentication headers
+curl -X POST https://localhost:3000/hello \
+  -H "x-siwe-message: localhost wants you to sign in..." \
+  -H "x-siwe-signature: 0x..."
 ```
+
+**Security Features:**
+- **No JWT required** - Direct signature verification on each request
+- **Header-based credentials** - Clean separation from request body
+- **Guard pattern** - Declarative protection with `@UseGuards(SiweGuard)`
+- **Request decoration** - Verified address available at `req.user.address`
 
 > **📖 For detailed SIWE usage, client examples (w3pk, MetaMask, ethers), and troubleshooting, see [docs/SIWE.md](docs/SIWE.md)**
 
