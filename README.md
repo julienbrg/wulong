@@ -1,98 +1,276 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Wulong
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+[![NestJS](https://img.shields.io/badge/NestJS-v11-E0234E?logo=nestjs)](https://nestjs.com/)
+[![Test](https://github.com/julienbrg/wulong/actions/workflows/test.yml/badge.svg)](https://github.com/julienbrg/wulong/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/julienbrg/wulong/branch/main/graph/badge.svg)](https://codecov.io/gh/julienbrg/wulong)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-10.23-F69220?logo=pnpm)](https://pnpm.io/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js)](https://nodejs.org/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+A NestJS API designed to run inside a Trusted Execution Environment (TEE), giving users cryptographic guarantees that the operator cannot access their data during processing.
 
-## Description
+## What is a TEE?
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+The server runs inside a hardware-isolated enclave (AMD SEV-SNP, Intel TDX, or AWS Nitro). The host OS — including the operator — cannot read the enclave's memory. TLS terminates inside the enclave, so plaintext never passes through host-controlled infrastructure. Users can verify the exact code running via the `/attestation` endpoint and compare it against this repository.
 
-## Project setup
+## Features
 
-```bash
-$ pnpm install
-```
+- ✅ **Hardware-isolated execution** - Code runs in a TEE enclave
+- ✅ **TLS termination inside enclave** - Host never sees plaintext
+- ✅ **Remote attestation** - Cryptographic proof of running code
+- ✅ **Sanitized logging** - No sensitive data in logs
+- ✅ **KMS integration** - Secrets fetched after attestation
+- ✅ **Rate limiting** - DoS protection
+- ✅ **Security headers** - Helmet.js integration
+- ✅ **Input validation** - All requests validated
+- ✅ **Health checks** - `/health`, `/health/ready`, `/health/live`
+- ✅ **API documentation** - Swagger/OpenAPI integration
 
-## Compile and run the project
+## Security Model
 
-```bash
-# development
-$ pnpm run start
+### Threat Model
 
-# watch mode
-$ pnpm run start:dev
+**Protected against:**
+- Malicious host operator reading memory
+- Network eavesdropping (TLS in enclave)
+- Log-based data exfiltration
+- Stack trace information leakage
 
-# production mode
-$ pnpm run start:prod
-```
+**NOT protected against:**
+- Side-channel attacks (timing, cache) - See [docs/SIDE_CHANNEL_ATTACKS.md](docs/SIDE_CHANNEL_ATTACKS.md) for mitigations
+- Physical access to hardware
+- Compromised TEE firmware
+- Application logic bugs
 
-## Run tests
+### Trust Assumptions
 
-```bash
-# unit tests
-$ pnpm run test
+You must trust:
+1. The TEE hardware vendor (AMD/Intel/AWS)
+2. This application code (verify via attestation)
+3. The KMS that releases secrets
 
-# e2e tests
-$ pnpm run test:e2e
+You do NOT need to trust:
+- The host OS
+- The cloud provider operator
+- Network infrastructure
 
-# test coverage
-$ pnpm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Installation
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+pnpm install
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Development Setup
 
-## Resources
+1. Copy environment template:
+```bash
+cp .env.template .env
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+2. Generate self-signed TLS certificates:
+```bash
+mkdir -p secrets
+openssl req -x509 -newkey rsa:4096 -keyout secrets/tls.key -out secrets/tls.cert -days 365 -nodes -subj "/CN=localhost"
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+3. Start the dev server:
+```bash
+pnpm start:dev
+```
 
-## Support
+4. Access the API documentation:
+```
+https://localhost:3000
+```
+(Accept the self-signed certificate warning in your browser)
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Production Deployment
 
-## Stay in touch
+> **📖 For detailed platform-specific deployment instructions, see [docs/TEE_SETUP.md](docs/TEE_SETUP.md)**
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### Prerequisites
+
+- TEE-enabled hardware (AMD SEV-SNP, Intel TDX, or AWS Nitro)
+- KMS endpoint configured to verify attestation
+- Production TLS certificates generated inside the enclave
+
+### Environment Variables
+
+```bash
+NODE_ENV=production
+KMS_URL=https://your-kms.example.com/release
+```
+
+### TEE Platform Integration
+
+The application now includes full attestation support for:
+
+1. **AMD SEV-SNP** - Uses `snpguest` or `sev-guest-get-report` tools
+   - Reads attestation reports from `/dev/sev-guest` device
+   - Extracts measurement hash for verification
+   - Install: `apt-get install snpguest` or build from AMD's sev-guest tools
+
+2. **Intel TDX** - Uses `tdx-attest` tool or direct `/dev/tdx-guest` access
+   - Generates TDX quotes containing MRTD measurements
+   - Install: `apt-get install tdx-attest` or build from Intel TDX SDK
+
+3. **AWS Nitro Enclaves** - Uses Nitro Security Module (NSM)
+   - Generates CBOR-encoded attestation documents with PCR measurements
+   - Requires: `nitro-cli` and NSM device (`/dev/nsm`)
+
+4. **Development Mode** - Automatically detects non-TEE environments
+   - Returns mock attestation with clear warnings
+   - Platform field set to 'none' for easy detection
+   - Safe for local development and testing
+
+### Platform Detection
+
+The service automatically detects the TEE platform at startup:
+- Checks for `/dev/sev-guest` → AMD SEV-SNP
+- Checks for `/dev/tdx-guest` → Intel TDX
+- Checks for `/dev/nsm` → AWS Nitro
+- Otherwise → Development mode (no TEE)
+
+### Installation of Platform Tools
+
+**AMD SEV-SNP:**
+```bash
+# Install from package (Ubuntu/Debian)
+apt-get install snpguest
+
+# Or build from source
+git clone https://github.com/virtee/snpguest
+cd snpguest && cargo build --release
+```
+
+**Intel TDX:**
+```bash
+# Install Intel TDX tools
+wget https://download.01.org/intel-sgx/latest/linux-latest/distro/ubuntu22.04-server/tdx-attest.deb
+dpkg -i tdx-attest.deb
+```
+
+**AWS Nitro:**
+```bash
+# Install AWS Nitro CLI
+amazon-linux-extras install aws-nitro-enclaves-cli
+# Or for Ubuntu:
+wget https://github.com/aws/aws-nitro-enclaves-cli/releases/latest/download/nitro-cli.deb
+dpkg -i nitro-cli.deb
+```
+
+## API Endpoints
+
+Full API documentation is available via Swagger UI at `https://localhost:3000` (development) or your production URL.
+
+### `GET /`
+Health check - returns greeting message.
+
+### `GET /attestation`
+Returns the TEE attestation report. Clients should:
+1. Fetch this endpoint
+2. Verify the report signature with TEE platform verification service
+3. Compare measurement hash against published Docker image SHA
+4. Only send sensitive data if verification succeeds
+
+### `GET /health`
+Basic health check for load balancers.
+
+### `GET /health/ready`
+Readiness probe - indicates if service is ready to accept traffic.
+
+### `GET /health/live`
+Liveness probe - indicates if service is alive.
+
+## Verifying the Deployment
+
+```bash
+# Get attestation report
+curl -k https://your-server.com/attestation
+
+# Example response:
+# {
+#   "platform": "amd-sev-snp",  // or "intel-tdx", "aws-nitro", "none"
+#   "report": "base64-encoded-attestation-report",
+#   "measurement": "hex-encoded-measurement-hash",
+#   "timestamp": "2026-03-17T...",
+#   "instructions": "Verify this report at..."
+# }
+
+# If platform is "none", you're NOT in a TEE (development mode)
+# If platform is a TEE type, verify the report cryptographically
+```
+
+### Verification Steps
+
+1. **Check Platform**: Ensure `platform` is not `"none"`
+2. **Verify Signature**: Use platform-specific verification service
+   - AMD SEV-SNP: Use AMD's KDS service
+   - Intel TDX: Use Intel's attestation verification API
+   - AWS Nitro: Use `aws-nitro-enclaves-cose` library
+3. **Compare Measurement**: Match against published Docker image SHA256
+4. **Trust Decision**: Only send sensitive data if verification passes
+
+## Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run in development mode
+pnpm start:dev
+
+# Build for production
+pnpm build
+
+# Run production build
+pnpm start:prod
+
+# Lint code
+pnpm lint
+
+# Format code
+pnpm format
+
+# Run tests
+pnpm test
+```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────┐
+│           TEE Enclave                   │
+│  ┌───────────────────────────────────┐  │
+│  │   NestJS Application              │  │
+│  │   - Attestation Controller        │  │
+│  │   - Business Logic                │  │
+│  │   - TLS Termination               │  │
+│  └───────────────────────────────────┘  │
+│              ↕                          │
+│  ┌───────────────────────────────────┐  │
+│  │   Secrets Service                 │  │
+│  │   (KMS integration)               │  │
+│  └───────────────────────────────────┘  │
+└─────────────────────────────────────────┘
+              ↕ (encrypted)
+      ┌──────────────┐
+      │     KMS      │
+      │  (external)  │
+      └──────────────┘
+```
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+GPL-3.0
+
+## Contact
+
+**Julien Béranger** ([GitHub](https://github.com/julienbrg))
+
+- Element: [@julienbrg:matrix.org](https://matrix.to/#/@julienbrg:matrix.org)
+- Farcaster: [julien-](https://warpcast.com/julien-)
+- Telegram: [@julienbrg](https://t.me/julienbrg)
+
+<img src="https://bafkreid5xwxz4bed67bxb2wjmwsec4uhlcjviwy7pkzwoyu5oesjd3sp64.ipfs.w3s.link" alt="built-with-ethereum-w3hc" width="100"/>
