@@ -17,6 +17,7 @@ The server runs inside a hardware-isolated enclave (AMD SEV-SNP, Intel TDX, or A
 - ✅ **Security headers** - Helmet.js integration
 - ✅ **Input validation** - All requests validated
 - ✅ **Health checks** - `/health`, `/health/ready`, `/health/live`
+- ✅ **API documentation** - Swagger/OpenAPI integration
 
 ## Security Model
 
@@ -70,6 +71,12 @@ openssl req -x509 -newkey rsa:4096 -keyout secrets/tls.key -out secrets/tls.cert
 pnpm start:dev
 ```
 
+4. Access the API documentation:
+```
+https://localhost:3000
+```
+(Accept the self-signed certificate warning in your browser)
+
 ## Production Deployment
 
 ### Prerequisites
@@ -99,6 +106,8 @@ Before production use, you must implement:
    - Include platform-specific measurement
 
 ## API Endpoints
+
+Full API documentation is available via Swagger UI at `https://localhost:3000` (development) or your production URL.
 
 ### `GET /`
 Health check - returns greeting message.
