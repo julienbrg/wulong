@@ -7,6 +7,8 @@ import { SecretsService } from './config/secrets.service';
 import { AttestationController } from './attestation/attestation.controller';
 import { TeePlatformService } from './attestation/tee-platform.service';
 import { HealthController } from './health/health.controller';
+import { AuthController } from './auth/auth.controller';
+import { SiweService } from './auth/siwe.service';
 import { validateEnvironment } from './config/env.validation';
 
 @Module({
@@ -24,8 +26,13 @@ import { validateEnvironment } from './config/env.validation';
       },
     ]),
   ],
-  controllers: [AppController, AttestationController, HealthController],
-  providers: [AppService, SecretsService, TeePlatformService],
-  exports: [SecretsService, TeePlatformService],
+  controllers: [
+    AppController,
+    AttestationController,
+    HealthController,
+    AuthController,
+  ],
+  providers: [AppService, SecretsService, TeePlatformService, SiweService],
+  exports: [SecretsService, TeePlatformService, SiweService],
 })
 export class AppModule {}

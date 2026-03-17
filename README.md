@@ -19,6 +19,7 @@ The server runs inside a hardware-isolated enclave (AMD SEV-SNP, Intel TDX, or A
 - ✅ **Hardware-isolated execution** - Code runs in a TEE enclave
 - ✅ **TLS termination inside enclave** - Host never sees plaintext
 - ✅ **Remote attestation** - Cryptographic proof of running code
+- ✅ **SIWE authentication** - Sign-In with Ethereum for Web3 auth
 - ✅ **Sanitized logging** - No sensitive data in logs
 - ✅ **KMS integration** - Secrets fetched after attestation
 - ✅ **Rate limiting** - DoS protection
@@ -164,23 +165,55 @@ dpkg -i nitro-cli.deb
 
 Full API documentation is available via Swagger UI at `https://localhost:3000` (development) or your production URL.
 
-### `GET /`
+### Authentication
+
+**Sign-In with Ethereum (SIWE)** - Stateless Web3 authentication
+
+- `POST /auth/nonce` - Generate a cryptographically secure nonce for SIWE authentication
+  - Returns nonce with 5-minute expiration
+  - Single-use nonces (consumed after verification)
+
+- `POST /auth/verify` - Verify SIWE message and signature
+  - Validates signature against SIWE message
+  - Checks nonce validity and expiration
+  - Returns verified Ethereum address on success
+
+- `POST /hello` - Legacy verify endpoint (same functionality as `/auth/verify`)
+
+**Example Flow:**
+```bash
+# 1. Get nonce
+curl -X POST https://localhost:3000/auth/nonce
+
+# 2. Sign SIWE message with your wallet (using w3pk, MetaMask, etc.)
+
+# 3. Verify signature
+curl -X POST https://localhost:3000/auth/verify \
+  -H "Content-Type: application/json" \
+  -d '{"message": "...SIWE message...", "signature": "0x..."}'
+```
+
+> **📖 For detailed SIWE usage, client examples (w3pk, MetaMask, ethers), and troubleshooting, see [docs/SIWE.md](docs/SIWE.md)**
+
+### Core Endpoints
+
+#### `GET /`
 Health check - returns greeting message.
 
-### `GET /attestation`
+#### `GET /attestation`
 Returns the TEE attestation report. Clients should:
 1. Fetch this endpoint
 2. Verify the report signature with TEE platform verification service
 3. Compare measurement hash against published Docker image SHA
 4. Only send sensitive data if verification succeeds
 
-### `GET /health`
+#### `GET /health`
 Basic health check for load balancers.
 
-### `GET /health/ready`
+#### `GET /health/ready`
 Readiness probe - indicates if service is ready to accept traffic.
 
-### `GET /health/live`
+#### `GET /health/live`
 Liveness probe - indicates if service is alive.
 
 ## Verifying the Deployment
