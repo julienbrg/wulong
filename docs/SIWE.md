@@ -4,8 +4,10 @@ This document explains how to use the SIWE authentication system in Wulong.
 
 ## Overview
 
-Wulong implements a minimalistic SIWE authentication system that allows users to authenticate using their Ethereum wallet. The system uses:
+Wulong implements a minimalistic SIWE authentication system using **NestJS Guards** that allows users to authenticate using their Ethereum wallet. The system uses:
 
+- **Guard-based authentication** - NestJS Guards validate SIWE signatures on protected endpoints
+- **Header-based credentials** - SIWE message and signature sent via HTTP headers
 - **Stateless nonce-based authentication** - No JWT tokens, no persistent sessions
 - **In-memory nonce storage** - Ephemeral, TEE-friendly (no data persistence)
 - **5-minute time window** - Nonces expire after 5 minutes
@@ -33,47 +35,46 @@ curl -k -X POST https://localhost:3000/auth/nonce
 }
 ```
 
-### 2. Verify Signature
+### 2. Access Protected Endpoints
 
-**Primary Endpoint:** `POST /auth/verify` (recommended)
-**Legacy Endpoint:** `POST /hello` (same functionality)
+Protected endpoints require SIWE authentication via HTTP headers. The `SiweGuard` automatically validates credentials.
 
-Verifies the SIWE message and signature. Returns the verified Ethereum address if valid.
+**Example: Protected Hello Endpoint**
+
+**Endpoint:** `POST /hello`
 
 **Request:**
 ```bash
-# Using /auth/verify (recommended)
-curl -k -X POST https://localhost:3000/auth/verify \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "message": "localhost wants you to sign in with your Ethereum account:\n0xYourAddress\n\n\nURI: https://localhost:3000\nVersion: 1\nChain ID: 1\nNonce: your-nonce-here\nIssued At: 2026-03-17T16:49:38.495Z",
-    "signature": "0x..."
-  }'
-
-# Or using /hello (legacy)
 curl -k -X POST https://localhost:3000/hello \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "message": "localhost wants you to sign in with your Ethereum account:\n0xYourAddress\n\n\nURI: https://localhost:3000\nVersion: 1\nChain ID: 1\nNonce: your-nonce-here\nIssued At: 2026-03-17T16:49:38.495Z",
-    "signature": "0x..."
-  }'
+  -H 'x-siwe-message: localhost wants you to sign in with your Ethereum account:
+0xYourAddress
+
+
+URI: https://localhost:3000
+Version: 1
+Chain ID: 1
+Nonce: your-nonce-here
+Issued At: 2026-03-17T16:49:38.495Z' \
+  -H 'x-siwe-signature: 0x...'
 ```
 
-**Response (Success):**
+**Response (Success - 200):**
 ```json
 {
-  "success": true,
+  "message": "Hello, authenticated user!",
   "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 }
 ```
 
-**Response (Failure):**
+**Response (Unauthorized - 401):**
 ```json
 {
-  "success": false,
-  "address": null
+  "statusCode": 401,
+  "message": "Invalid SIWE signature or expired nonce"
 }
 ```
+
+**Note:** The SIWE message in the header should be properly formatted (use literal newlines or escape them depending on your HTTP client).
 
 ## Authentication Flow
 
@@ -95,20 +96,25 @@ curl -k -X POST https://localhost:3000/hello \
      │  4. Sign message               │                                │
      │<───────────────────────────────┼────────────────────────────────│
      │                                │                                │
-     │  5. POST /auth/verify          │                                │
-     │    {message, signature}        │                                │
+     │  5. POST /hello (or other      │                                │
+     │     protected endpoint)        │                                │
+     │     Headers:                   │                                │
+     │     x-siwe-message: ...        │                                │
+     │     x-siwe-signature: ...      │                                │
      │───────────────────────────────>│                                │
      │                                │                                │
-     │                                │  6. Verify signature           │
-     │                                │  7. Check nonce validity       │
-     │                                │  8. Delete nonce (single-use)  │
+     │                                │  6. SiweGuard intercepts       │
+     │                                │  7. Verify signature           │
+     │                                │  8. Check nonce validity       │
+     │                                │  9. Delete nonce (single-use)  │
+     │                                │ 10. Attach address to request  │
      │                                │                                │
-     │  9. {success, address}         │                                │
+     │ 11. Response with address      │                                │
      │<───────────────────────────────│                                │
      │                                │                                │
 ```
 
-**Note:** You can use either `/auth/verify` (recommended) or `/hello` (legacy) in step 5.
+**Note:** Any endpoint protected with `@UseGuards(SiweGuard)` can be accessed this way.
 
 ## Step-by-Step Guide
 
@@ -149,15 +155,17 @@ const message = siweMessage.prepareMessage();
 // Step 3: Sign the message
 const signature = await wallet.signMessage(message);
 
-// Step 4: Verify with server
-const verifyResponse = await fetch('https://localhost:3000/auth/verify', {
+// Step 4: Access protected endpoint with headers
+const response = await fetch('https://localhost:3000/hello', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ message, signature }),
+  headers: {
+    'x-siwe-message': message,
+    'x-siwe-signature': signature,
+  },
 });
 
-const result = await verifyResponse.json();
-console.log(result); // { success: true, address: "0x..." }
+const result = await response.json();
+console.log(result); // { message: "Hello, authenticated user!", address: "0x..." }
 ```
 
 ### Using w3pk (WebAuthn Passkey Wallet)
@@ -200,15 +208,17 @@ const { signature } = await w3pk.signMessage(siweMessage, {
   signingMethod: 'SIWE'  // EIP-4361 compliant
 });
 
-// Step 5: Verify with Wulong
-const response = await fetch('https://localhost:3000/auth/verify', {
+// Step 5: Access protected endpoint with Wulong
+const response = await fetch('https://localhost:3000/hello', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ message: siweMessage, signature }),
+  headers: {
+    'x-siwe-message': siweMessage,
+    'x-siwe-signature': signature,
+  },
 });
 
 const result = await response.json();
-console.log(result); // { success: true, address: "0x..." }
+console.log(result); // { message: "Hello, authenticated user!", address: "0x..." }
 ```
 
 **Benefits of w3pk:**
@@ -246,11 +256,13 @@ const signature = await ethereum.request({
   params: [message, ethereum.selectedAddress],
 });
 
-// Step 4: Verify with server
-const response = await fetch('https://localhost:3000/auth/verify', {
+// Step 4: Access protected endpoint with headers
+const response = await fetch('https://localhost:3000/hello', {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ message, signature }),
+  headers: {
+    'x-siwe-message': message,
+    'x-siwe-signature': signature,
+  },
 });
 
 const result = await response.json();
@@ -294,14 +306,19 @@ Issued At: 2026-03-17T16:00:00.000Z
 3. Paste the complete SIWE message from Step 2
 4. Connect your wallet and sign
 
-**Step 4:** Verify with server
+**Step 4:** Access protected endpoint
 ```bash
-curl -k -X POST https://localhost:3000/auth/verify \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "message": "localhost wants you to sign in with your Ethereum account:\n0xYourChecksummedAddress\n\n\nURI: https://localhost:3000\nVersion: 1\nChain ID: 1\nNonce: d4c595490e15489574ca06494154cbedd156db6629224481221c04f83ac32d9e\nIssued At: 2026-03-17T16:00:00.000Z",
-    "signature": "0xYourSignatureFromEtherscan..."
-  }'
+curl -k -X POST https://localhost:3000/hello \
+  -H 'x-siwe-message: localhost wants you to sign in with your Ethereum account:
+0xYourChecksummedAddress
+
+
+URI: https://localhost:3000
+Version: 1
+Chain ID: 1
+Nonce: d4c595490e15489574ca06494154cbedd156db6629224481221c04f83ac32d9e
+Issued At: 2026-03-17T16:00:00.000Z' \
+  -H 'x-siwe-signature: 0xYourSignatureFromEtherscan...'
 ```
 
 ## SIWE Message Format
@@ -336,34 +353,36 @@ When sending via JSON, escape the newlines:
 
 ## Common Issues
 
-### 1. "success: false" Response
+### 1. "401 Unauthorized" Response
 
 **Possible causes:**
+- **Missing headers** - `x-siwe-message` and `x-siwe-signature` headers are required
 - **Expired nonce** - Nonces expire after 5 minutes
 - **Used nonce** - Each nonce can only be used once
 - **Invalid signature** - The signature doesn't match the message
 - **Message format mismatch** - The signed message doesn't exactly match the format
 
-**Solution:** Always get a fresh nonce and sign it immediately.
+**Solution:** Always get a fresh nonce and sign it immediately, then include both headers in your request.
 
-### 2. "Bad control character in string" Error
+### 2. Newline Handling in Headers
 
-**Cause:** Newlines in the SIWE message are not properly escaped in JSON.
+**Cause:** Different HTTP clients handle newlines differently in headers.
 
-**Solution:** Use `\n` to represent newlines in JSON strings, not literal newlines.
+**Solution:**
+- In curl, use literal newlines in single-quoted headers
+- In JavaScript fetch, include literal newlines in the string
+- If your client doesn't support multi-line headers, you may need to escape them as `\n`
 
-❌ Wrong:
-```json
-{
-  "message": "line 1
-  line 2"
-}
+✅ Correct (curl):
+```bash
+curl -H 'x-siwe-message: line 1
+line 2'
 ```
 
-✅ Correct:
-```json
-{
-  "message": "line 1\nline 2"
+✅ Correct (JavaScript):
+```javascript
+headers: {
+  'x-siwe-message': 'line 1\nline 2'
 }
 ```
 
@@ -429,9 +448,31 @@ This SIWE implementation is designed for TEE environments:
 
 ### Rate Limiting
 
-The `/auth/nonce` and `/hello` endpoints are protected by the global rate limiter:
+Protected endpoints (including those with `SiweGuard`) and `/auth/nonce` are protected by the global rate limiter:
 - 10 requests per minute per IP address
 - Prevents brute-force attacks and DoS
+
+### Guard-Based Architecture
+
+- **`SiweGuard`** - NestJS Guard that implements `CanActivate`
+- Extracts credentials from `x-siwe-message` and `x-siwe-signature` headers
+- Verifies signature using SIWE library
+- Validates nonce (existence, expiration, single-use)
+- Attaches verified address to `request.user.address`
+- Throws `UnauthorizedException` (401) on any validation failure
+
+**Usage in controllers:**
+```typescript
+import { UseGuards, Request } from '@nestjs/common';
+import { SiweGuard } from './auth/siwe.guard';
+
+@UseGuards(SiweGuard)
+@Post('protected')
+async protectedEndpoint(@Request() req) {
+  // req.user.address contains the verified Ethereum address
+  return { address: req.user.address };
+}
+```
 
 ## Testing
 
@@ -441,8 +482,10 @@ pnpm test
 ```
 
 The tests verify:
-- SiweService is properly injected
-- Invalid signatures return `{success: false, address: null}`
+- SiweService and SiweGuard are properly injected
+- SiweGuard throws `UnauthorizedException` when headers are missing
+- SiweGuard throws `UnauthorizedException` for invalid signatures
+- Protected endpoints return authenticated address when valid
 - Nonce generation works correctly
 - Nonce expiration is enforced
 
