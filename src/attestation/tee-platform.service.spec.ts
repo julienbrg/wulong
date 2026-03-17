@@ -85,8 +85,8 @@ describe('TeePlatformService', () => {
       service = module.get<TeePlatformService>(TeePlatformService);
     });
 
-    it('should generate mock attestation for none platform', () => {
-      const result = service.generateAttestationReport();
+    it('should generate mock attestation for none platform', async () => {
+      const result = await service.generateAttestationReport();
 
       expect(result.platform).toBe('none');
       expect(result.report).toBeDefined();
@@ -100,17 +100,17 @@ describe('TeePlatformService', () => {
       expect(decoded.warning).toBe('MOCK_ATTESTATION_FOR_DEVELOPMENT_ONLY');
     });
 
-    it('should include timestamp in mock attestation', () => {
-      const result = service.generateAttestationReport();
+    it('should include timestamp in mock attestation', async () => {
+      const result = await service.generateAttestationReport();
 
       expect(result.timestamp).toMatch(
         /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
       );
     });
 
-    it('should accept optional user data parameter', () => {
+    it('should accept optional user data parameter', async () => {
       const userData = Buffer.from('test-user-data');
-      const result = service.generateAttestationReport(userData);
+      const result = await service.generateAttestationReport(userData);
 
       expect(result).toBeDefined();
       expect(result.platform).toBe('none');

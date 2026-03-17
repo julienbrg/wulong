@@ -35,12 +35,12 @@ describe('AttestationController', () => {
   });
 
   describe('getAttestation', () => {
-    it('should return attestation with instructions for mock platform', () => {
+    it('should return attestation with instructions for mock platform', async () => {
       jest
         .spyOn(teePlatformService, 'generateAttestationReport')
-        .mockReturnValue(mockAttestationReport);
+        .mockResolvedValue(mockAttestationReport);
 
-      const result = controller.getAttestation();
+      const result = await controller.getAttestation();
 
       expect(result).toHaveProperty('platform', 'none');
       expect(result).toHaveProperty('report', 'mock-report-base64');
@@ -56,16 +56,16 @@ describe('AttestationController', () => {
       ).toBeDefined();
     });
 
-    it('should return AMD SEV-SNP verification instructions', () => {
+    it('should return AMD SEV-SNP verification instructions', async () => {
       const sevReport = {
         ...mockAttestationReport,
         platform: 'amd-sev-snp' as const,
       };
       jest
         .spyOn(teePlatformService, 'generateAttestationReport')
-        .mockReturnValue(sevReport);
+        .mockResolvedValue(sevReport);
 
-      const result = controller.getAttestation();
+      const result = await controller.getAttestation();
 
       expect(result.platform).toBe('amd-sev-snp');
       expect(result.instructions).toContain('SEV-SNP');
@@ -73,16 +73,16 @@ describe('AttestationController', () => {
       expect(result.instructions).toContain('kdsintf.amd.com');
     });
 
-    it('should return Intel TDX verification instructions', () => {
+    it('should return Intel TDX verification instructions', async () => {
       const tdxReport = {
         ...mockAttestationReport,
         platform: 'intel-tdx' as const,
       };
       jest
         .spyOn(teePlatformService, 'generateAttestationReport')
-        .mockReturnValue(tdxReport);
+        .mockResolvedValue(tdxReport);
 
-      const result = controller.getAttestation();
+      const result = await controller.getAttestation();
 
       expect(result.platform).toBe('intel-tdx');
       expect(result.instructions).toContain('TDX');
@@ -91,16 +91,16 @@ describe('AttestationController', () => {
       expect(result.instructions).toContain('trustedservices.intel.com');
     });
 
-    it('should return AWS Nitro verification instructions', () => {
+    it('should return AWS Nitro verification instructions', async () => {
       const nitroReport = {
         ...mockAttestationReport,
         platform: 'aws-nitro' as const,
       };
       jest
         .spyOn(teePlatformService, 'generateAttestationReport')
-        .mockReturnValue(nitroReport);
+        .mockResolvedValue(nitroReport);
 
-      const result = controller.getAttestation();
+      const result = await controller.getAttestation();
 
       expect(result.platform).toBe('aws-nitro');
       expect(result.instructions).toContain('Nitro');
@@ -108,14 +108,12 @@ describe('AttestationController', () => {
       expect(result.instructions).toContain('aws-nitro-enclaves-cose');
     });
 
-    it('should handle errors from TeePlatformService', () => {
+    it('should handle errors from TeePlatformService', async () => {
       jest
         .spyOn(teePlatformService, 'generateAttestationReport')
-        .mockImplementation(() => {
-          throw new Error('TEE error');
-        });
+        .mockRejectedValue(new Error('TEE error'));
 
-      expect(() => controller.getAttestation()).toThrow('TEE error');
+      await expect(controller.getAttestation()).rejects.toThrow('TEE error');
     });
   });
 });

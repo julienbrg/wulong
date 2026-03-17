@@ -57,18 +57,26 @@ export class TeePlatformService {
   /**
    * Generates an attestation report for the current platform.
    */
-  generateAttestationReport(userData?: Buffer): AttestationReport {
+  async generateAttestationReport(
+    userData?: Buffer,
+  ): Promise<AttestationReport> {
     const timestamp = new Date().toISOString();
 
     switch (this.platform) {
       case 'amd-sev-snp':
-        return this.generateSevSnpAttestation(userData, timestamp);
+        return await Promise.resolve(
+          this.generateSevSnpAttestation(userData, timestamp),
+        );
       case 'intel-tdx':
-        return this.generateTdxAttestation(userData, timestamp);
+        return await Promise.resolve(
+          this.generateTdxAttestation(userData, timestamp),
+        );
       case 'aws-nitro':
-        return this.generateNitroAttestation(userData, timestamp);
+        return await Promise.resolve(
+          this.generateNitroAttestation(userData, timestamp),
+        );
       case 'none':
-        return this.generateMockAttestation(timestamp);
+        return await Promise.resolve(this.generateMockAttestation(timestamp));
     }
   }
 

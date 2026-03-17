@@ -50,7 +50,7 @@ export class SecretsService implements OnModuleInit {
       throw new Error('KMS_URL environment variable is required in production');
     }
 
-    const attestationReport = this.getAttestationReport();
+    const attestationReport = await this.getAttestationReport();
 
     const response = await fetch(kmsUrl, {
       method: 'POST',
@@ -69,8 +69,8 @@ export class SecretsService implements OnModuleInit {
     this.logger.log('Secrets loaded from KMS');
   }
 
-  private getAttestationReport(): string {
-    const attestation = this.teePlatform.generateAttestationReport();
+  private async getAttestationReport(): Promise<string> {
+    const attestation = await this.teePlatform.generateAttestationReport();
     return attestation.report;
   }
 }
