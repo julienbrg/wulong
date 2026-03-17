@@ -8,6 +8,10 @@ describe('Application (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeAll(async () => {
+    // Set test environment variables
+    process.env.NODE_ENV = 'test';
+    process.env.KMS_URL = 'http://localhost:3001';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
