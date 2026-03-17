@@ -1,5 +1,13 @@
 # Wulong
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Test](https://github.com/julienbrg/wulong/actions/workflows/test.yml/badge.svg)](https://github.com/julienbrg/wulong/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/julienbrg/wulong/branch/main/graph/badge.svg)](https://codecov.io/gh/julienbrg/wulong)
+[![NestJS](https://img.shields.io/badge/NestJS-v11-E0234E?logo=nestjs)](https://nestjs.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-10.23-F69220?logo=pnpm)](https://pnpm.io/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js)](https://nodejs.org/)
+
 A NestJS API designed to run inside a Trusted Execution Environment (TEE), giving users cryptographic guarantees that the operator cannot access their data during processing.
 
 ## What is a TEE?
@@ -30,7 +38,7 @@ The server runs inside a hardware-isolated enclave (AMD SEV-SNP, Intel TDX, or A
 - Stack trace information leakage
 
 **NOT protected against:**
-- Side-channel attacks (timing, cache)
+- Side-channel attacks (timing, cache) - See [docs/SIDE_CHANNEL_ATTACKS.md](docs/SIDE_CHANNEL_ATTACKS.md) for mitigations
 - Physical access to hardware
 - Compromised TEE firmware
 - Application logic bugs
@@ -78,6 +86,8 @@ https://localhost:3000
 (Accept the self-signed certificate warning in your browser)
 
 ## Production Deployment
+
+> **📖 For detailed platform-specific deployment instructions, see [docs/TEE_SETUP.md](docs/TEE_SETUP.md)**
 
 ### Prerequisites
 
