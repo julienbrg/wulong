@@ -5,12 +5,4 @@ import { Injectable } from '@nestjs/common';
  * Contains core business logic.
  */
 @Injectable()
-export class AppService {
-  /**
-   * Returns a greeting message.
-   * @returns Greeting string
-   */
-  getHello(): string {
-    return 'Hello World!';
-  }
-}
+export class AppService {}

@@ -1,4 +1,5 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Inject } from '@nestjs/common';
+import { TeePlatformService } from '../attestation/tee-platform.service';
 
 /**
  * Manages application secrets, loading them from KMS in production
@@ -11,6 +12,11 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 export class SecretsService implements OnModuleInit {
   private readonly logger = new Logger('SecretsService');
   private secrets: Map<string, string> = new Map();
+
+  constructor(
+    @Inject(TeePlatformService)
+    private readonly teePlatform: TeePlatformService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     if (process.env.NODE_ENV === 'production') {
@@ -64,10 +70,7 @@ export class SecretsService implements OnModuleInit {
   }
 
   private async getAttestationReport(): Promise<string> {
-    // TODO: implement for your TEE platform
-    // AMD SEV-SNP  → read from /dev/sev-guest
-    // Intel TDX    → use tdx-guest library
-    // AWS Nitro    → use nsm-api bindings
-    throw new Error('getAttestationReport() not implemented');
+    const attestation = await this.teePlatform.generateAttestationReport();
+    return attestation.report;
   }
 }

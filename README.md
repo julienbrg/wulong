@@ -92,18 +92,63 @@ NODE_ENV=production
 KMS_URL=https://your-kms.example.com/release
 ```
 
-### TODO: Implement TEE Platform Integration
+### TEE Platform Integration
 
-Before production use, you must implement:
+The application now includes full attestation support for:
 
-1. **Attestation Generation** (`src/config/secrets.service.ts:66`)
-   - AMD SEV-SNP: Read from `/dev/sev-guest`
-   - Intel TDX: Use `tdx-guest` library
-   - AWS Nitro: Use `nsm-api` bindings
+1. **AMD SEV-SNP** - Uses `snpguest` or `sev-guest-get-report` tools
+   - Reads attestation reports from `/dev/sev-guest` device
+   - Extracts measurement hash for verification
+   - Install: `apt-get install snpguest` or build from AMD's sev-guest tools
 
-2. **Attestation Endpoint** (`src/attestation/attestation.controller.ts:25`)
-   - Replace placeholders with real attestation report
-   - Include platform-specific measurement
+2. **Intel TDX** - Uses `tdx-attest` tool or direct `/dev/tdx-guest` access
+   - Generates TDX quotes containing MRTD measurements
+   - Install: `apt-get install tdx-attest` or build from Intel TDX SDK
+
+3. **AWS Nitro Enclaves** - Uses Nitro Security Module (NSM)
+   - Generates CBOR-encoded attestation documents with PCR measurements
+   - Requires: `nitro-cli` and NSM device (`/dev/nsm`)
+
+4. **Development Mode** - Automatically detects non-TEE environments
+   - Returns mock attestation with clear warnings
+   - Platform field set to 'none' for easy detection
+   - Safe for local development and testing
+
+### Platform Detection
+
+The service automatically detects the TEE platform at startup:
+- Checks for `/dev/sev-guest` → AMD SEV-SNP
+- Checks for `/dev/tdx-guest` → Intel TDX
+- Checks for `/dev/nsm` → AWS Nitro
+- Otherwise → Development mode (no TEE)
+
+### Installation of Platform Tools
+
+**AMD SEV-SNP:**
+```bash
+# Install from package (Ubuntu/Debian)
+apt-get install snpguest
+
+# Or build from source
+git clone https://github.com/virtee/snpguest
+cd snpguest && cargo build --release
+```
+
+**Intel TDX:**
+```bash
+# Install Intel TDX tools
+wget https://download.01.org/intel-sgx/latest/linux-latest/distro/ubuntu22.04-server/tdx-attest.deb
+dpkg -i tdx-attest.deb
+```
+
+**AWS Nitro:**
+```bash
+# Install AWS Nitro CLI
+amazon-linux-extras install aws-nitro-enclaves-cli
+# Or for Ubuntu:
+wget https://github.com/aws/aws-nitro-enclaves-cli/releases/latest/download/nitro-cli.deb
+dpkg -i nitro-cli.deb
+```
 
 ## API Endpoints
 
@@ -134,9 +179,28 @@ Liveness probe - indicates if service is alive.
 # Get attestation report
 curl -k https://your-server.com/attestation
 
-# Verify with your TEE platform's verification service
-# Compare measurement against published release SHA
+# Example response:
+# {
+#   "platform": "amd-sev-snp",  // or "intel-tdx", "aws-nitro", "none"
+#   "report": "base64-encoded-attestation-report",
+#   "measurement": "hex-encoded-measurement-hash",
+#   "timestamp": "2026-03-17T...",
+#   "instructions": "Verify this report at..."
+# }
+
+# If platform is "none", you're NOT in a TEE (development mode)
+# If platform is a TEE type, verify the report cryptographically
 ```
+
+### Verification Steps
+
+1. **Check Platform**: Ensure `platform` is not `"none"`
+2. **Verify Signature**: Use platform-specific verification service
+   - AMD SEV-SNP: Use AMD's KDS service
+   - Intel TDX: Use Intel's attestation verification API
+   - AWS Nitro: Use `aws-nitro-enclaves-cose` library
+3. **Compare Measurement**: Match against published Docker image SHA256
+4. **Trust Decision**: Only send sensitive data if verification passes
 
 ## Development
 

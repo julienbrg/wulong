@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { SecretsService } from './config/secrets.service';
 import { AttestationController } from './attestation/attestation.controller';
+import { TeePlatformService } from './attestation/tee-platform.service';
 import { HealthController } from './health/health.controller';
 import { validateEnvironment } from './config/env.validation';
 
@@ -24,7 +25,7 @@ import { validateEnvironment } from './config/env.validation';
     ]),
   ],
   controllers: [AppController, AttestationController, HealthController],
-  providers: [AppService, SecretsService],
-  exports: [SecretsService],
+  providers: [AppService, SecretsService, TeePlatformService],
+  exports: [SecretsService, TeePlatformService],
 })
 export class AppModule {}
