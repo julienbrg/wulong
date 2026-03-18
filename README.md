@@ -10,6 +10,14 @@
 
 A NestJS API designed to run inside a Trusted Execution Environment (TEE), giving users cryptographic guarantees that the operator cannot access their data during processing.
 
+## Features
+
+- Quantum-resistant encryption ([ML-KEM-1024](https://csrc.nist.gov/pubs/fips/203/final), see [client guide](docs/CLIENT_ENCRYPTION.md))
+- TEE attestation ([AMD SEV-SNP](https://www.amd.com/en/developer/sev.html), [Intel TDX](https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html), [AWS Nitro](https://aws.amazon.com/ec2/nitro/), [Phala](https://phala.network/), see [setup guide](docs/TEE_SETUP.md))
+- Web3 authentication ([SIWE](https://login.xyz), see [auth guide](docs/SIWE.md))
+- Zero-trust security model (see [overview](docs/OVERVIEW.md))
+- [TypeScript](https://www.typescriptlang.org/) with [NestJS](https://nestjs.com/)
+
 ## Install
 
 ```bash
@@ -29,6 +37,13 @@ mkdir -p secrets
 openssl req -x509 -newkey rsa:4096 -keyout secrets/tls.key -out secrets/tls.cert -days 365 -nodes -subj "/CN=localhost"
 ```
 
+Generate ML-KEM-1024 keypair:
+```bash
+node scripts/generate-mlkem-keypair.mjs
+```
+
+> ⚠️ The private key will be stored in `secrets/mlkem.key`. Never commit this file!
+
 Start the dev server:
 ```bash
 pnpm start:dev
@@ -41,40 +56,14 @@ https://localhost:3000
 
 __Accept the self-signed certificate warning in your browser. Please note the 's' in 'https'.__
 
-## API Endpoints
-
-### Core Endpoints
-
-- **`GET /chest/attestation`** - Get TEE attestation proving the service cannot access user data
-  - Returns platform type, cryptographic report, code measurement, and timestamp
-  - Publicly accessible (no authentication required)
-  - Users verify the measurement matches published source code
-
-- **`POST /chest/store`** - Store a secret with owner-based access control
-  - Requires: `secret` (string) and `publicAddresses` (Ethereum addresses)
-  - Returns: unique `slot` identifier
-  - No authentication required for storing
-
-- **`GET /chest/access/:slot`** - Access a stored secret
-  - Requires: SIWE authentication via headers
-  - Returns: secret if authenticated address is an owner
-  - Protected by SIWE guard
-
-### Authentication & Health
-
-- **`POST /auth/nonce`** - Generate SIWE nonce for authentication
-- **`GET /health`** - Health check endpoint
-- **`GET /health/ready`** - Readiness probe
-- **`GET /health/live`** - Liveness probe
-
-See the Swagger documentation at `https://localhost:3000` for complete API details.
-
 ## Docs
 
-- [**Overview**](docs/OVERVIEW.md) - Complete project overview, features, installation, and API endpoints
-- [**TEE Setup**](docs/TEE_SETUP.md) - Platform-specific deployment instructions for AMD SEV-SNP, Intel TDX, AWS Nitro, and Phala Network
-- [**SIWE Authentication**](docs/SIWE.md) - Sign-In with Ethereum integration guide and client examples
-- [**Side Channel Attacks**](docs/SIDE_CHANNEL_ATTACKS.md) - Security considerations and mitigation strategies
+- [**API Reference**](docs/API_REFERENCE.md) - Complete REST API endpoint documentation
+- [**Overview**](docs/OVERVIEW.md) - Project overview, architecture, and security model
+- [**Client-Side Encryption**](docs/CLIENT_ENCRYPTION.md) - Quantum-resistant ML-KEM encryption guide
+- [**TEE Setup**](docs/TEE_SETUP.md) - Platform-specific deployment (AMD SEV-SNP, Intel TDX, AWS Nitro, Phala)
+- [**SIWE Authentication**](docs/SIWE.md) - Ethereum wallet authentication guide
+- [**Side Channel Attacks**](docs/SIDE_CHANNEL_ATTACKS.md) - Security considerations and mitigations
 
 ## License
 

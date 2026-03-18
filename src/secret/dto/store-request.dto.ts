@@ -4,7 +4,7 @@ import { IsString, IsArray, IsNotEmpty, ArrayMinSize } from 'class-validator';
 export class StoreRequestDto {
   @ApiProperty({
     description: 'The secret to store',
-    example: 'my-super-secret-value',
+    example: 'my-super-secret-data',
   })
   @IsString()
   @IsNotEmpty()
@@ -12,7 +12,7 @@ export class StoreRequestDto {
 
   @ApiProperty({
     description: 'Array of Ethereum addresses that can access this secret',
-    example: ['0xbFBaa5a59e3b6c06afF9c975092B8705f804Fa1c'],
+    example: ['0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'],
     type: [String],
   })
   @IsArray()

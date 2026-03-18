@@ -10,6 +10,7 @@ import * as path from 'path';
 import { randomBytes } from 'crypto';
 import { TeePlatformService } from '../attestation/tee-platform.service';
 import { AttestationResponseDto } from './dto/attestation-response.dto';
+import { MlKemEncryptionService } from '../encryption/mlkem-encryption.service';
 
 interface SecretEntry {
   secret: string;
@@ -27,7 +28,10 @@ interface SecretData {
 export class SecretService {
   private readonly secretPath: string;
 
-  constructor(private readonly teePlatformService: TeePlatformService) {
+  constructor(
+    private readonly teePlatformService: TeePlatformService,
+    private readonly mlkemEncryptionService: MlKemEncryptionService,
+  ) {
     this.secretPath = path.join(process.cwd(), 'chest.json');
   }
 
@@ -130,12 +134,17 @@ export class SecretService {
   async getAttestation(): Promise<AttestationResponseDto> {
     const attestation =
       await this.teePlatformService.generateAttestationReport();
+
+    // Include ML-KEM public key for quantum-resistant encryption
+    const mlkemPublicKey = this.mlkemEncryptionService.getPublicKey();
+
     return {
       platform: attestation.platform,
       report: attestation.report,
       measurement: attestation.measurement,
       timestamp: attestation.timestamp,
       publicKey: attestation.publicKey,
+      mlkemPublicKey: mlkemPublicKey || undefined,
     };
   }
 

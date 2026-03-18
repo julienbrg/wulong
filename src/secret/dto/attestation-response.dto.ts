@@ -32,4 +32,13 @@ export class AttestationResponseDto {
     example: '0x1234567890abcdef...',
   })
   publicKey?: string;
+
+  @ApiProperty({
+    description:
+      'ML-KEM-1024 public key for quantum-resistant encryption (base64). ' +
+      'Clients can encrypt secrets with this key; only the TEE can decrypt with the private key stored in .env',
+    required: false,
+    example: '6RNr8BvBcRe9ivVfuYkN40YCxgE...',
+  })
+  mlkemPublicKey?: string;
 }
