@@ -12,7 +12,9 @@ A NestJS API designed to run inside a Trusted Execution Environment (TEE), givin
 
 ## What is a TEE?
 
-The server runs inside a hardware-isolated enclave (AMD SEV-SNP, Intel TDX, or AWS Nitro). The host OS — including the operator — cannot read the enclave's memory. TLS terminates inside the enclave, so plaintext never passes through host-controlled infrastructure. Users can verify the exact code running via the `/attestation` endpoint and compare it against this repository.
+The server runs inside a hardware-isolated enclave (AMD SEV-SNP, Intel TDX, AWS Nitro, or Phala Network's Intel TDX). The host OS — including the operator — cannot read the enclave's memory. TLS terminates inside the enclave, so plaintext never passes through host-controlled infrastructure. Users can verify the exact code running via the `/attestation` endpoint and compare it against this repository.
+
+**Note on Phala Network**: Wulong can run on Phala Network's Intel TDX infrastructure. Phala also supports Intel SGX, but Wulong does not currently support SGX. See [docs/TEE_SETUP.md](docs/TEE_SETUP.md#phala-network-intel-tdxsgx) for deployment details.
 
 ## Features
 
@@ -92,7 +94,7 @@ https://localhost:3000
 
 ### Prerequisites
 
-- TEE-enabled hardware (AMD SEV-SNP, Intel TDX, or AWS Nitro)
+- TEE-enabled hardware (AMD SEV-SNP, Intel TDX, AWS Nitro, or Phala Network)
 - KMS endpoint configured to verify attestation
 - Production TLS certificates generated inside the enclave
 
@@ -115,12 +117,18 @@ The application now includes full attestation support for:
 2. **Intel TDX** - Uses `tdx-attest` tool or direct `/dev/tdx-guest` access
    - Generates TDX quotes containing MRTD measurements
    - Install: `apt-get install tdx-attest` or build from Intel TDX SDK
+   - ✅ **Production Ready** - Compatible with Phala Network's Dstack infrastructure
 
 3. **AWS Nitro Enclaves** - Uses Nitro Security Module (NSM)
    - Generates CBOR-encoded attestation documents with PCR measurements
    - Requires: `nitro-cli` and NSM device (`/dev/nsm`)
 
-4. **Development Mode** - Automatically detects non-TEE environments
+4. **Phala Network** - Deploy via [Dstack](https://docs.phala.com/dstack/getting-started) on Intel TDX
+   - Docker-based deployment to TEE infrastructure
+   - Supports Phala Cloud managed service or self-hosted
+   - See [docs/TEE_SETUP.md#phala-network-intel-tdxsgx](docs/TEE_SETUP.md#phala-network-intel-tdxsgx) for details
+
+5. **Development Mode** - Automatically detects non-TEE environments
    - Returns mock attestation with clear warnings
    - Platform field set to 'none' for easy detection
    - Safe for local development and testing
@@ -159,6 +167,16 @@ amazon-linux-extras install aws-nitro-enclaves-cli
 # Or for Ubuntu:
 wget https://github.com/aws/aws-nitro-enclaves-cli/releases/latest/download/nitro-cli.deb
 dpkg -i nitro-cli.deb
+```
+
+**Phala Network:**
+```bash
+# Deploy via Docker to Dstack
+# See detailed guide: https://docs.phala.com/dstack/getting-started
+
+# Phala Cloud CLI (for managed deployments)
+phala cvms attestation  # View attestation reports
+phala cvms list         # List your CVMs
 ```
 
 ## API Endpoints

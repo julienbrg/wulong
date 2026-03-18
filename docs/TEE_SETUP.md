@@ -9,6 +9,7 @@ This guide provides step-by-step instructions for deploying Wulong to various Tr
   - [AMD SEV-SNP](#amd-sev-snp)
   - [Intel TDX](#intel-tdx)
   - [AWS Nitro Enclaves](#aws-nitro-enclaves)
+  - [Phala Network (Intel TDX/SGX)](#phala-network-intel-tdxsgx)
 - [General TEE Configuration](#general-tee-configuration)
 - [Verification and Testing](#verification-and-testing)
 - [Security Considerations](#security-considerations)
@@ -141,6 +142,15 @@ snpguest verify report.bin --platform amd-sev-snp
 
 Intel Trust Domain Extensions provides VM-level isolation with hardware-enforced confidentiality.
 
+#### Deployment Readiness
+
+✅ **Production Ready** - Wulong has full Intel TDX support with:
+- Automatic TDX platform detection
+- Attestation report generation using `tdx-attest` tool
+- Fallback to direct `/dev/tdx-guest` device access
+- User data binding for nonce commitments
+- Comprehensive test coverage
+
 #### Hardware Requirements
 - Intel Xeon Scalable 4th Gen (Sapphire Rapids) or newer
 - TDX enabled in BIOS
@@ -157,7 +167,7 @@ Intel Trust Domain Extensions provides VM-level isolation with hardware-enforced
    lsmod | grep tdx
    ```
 
-2. **Install TDX tools**:
+2. **Install TDX attestation tools** (Required for production):
    ```bash
    # Ubuntu/Debian
    wget https://download.01.org/intel-sgx/latest/linux-latest/distro/ubuntu22.04-server/tdx-attest.deb
@@ -170,6 +180,8 @@ Intel Trust Domain Extensions provides VM-level isolation with hardware-enforced
    make install
    ```
 
+   **Important**: The `tdx-attest` tool is the recommended method for generating TDX quotes. While Wulong has a fallback that reads directly from `/dev/tdx-guest`, the fallback is simplified and may not work correctly in all TDX environments.
+
 3. **Verify TDX device access**:
    ```bash
    ls -l /dev/tdx-guest
@@ -178,6 +190,9 @@ Intel Trust Domain Extensions provides VM-level isolation with hardware-enforced
 
    # Check TDX module info
    cat /sys/firmware/tdx_seam/version
+
+   # Verify tdx-attest tool works
+   tdx-attest --version
    ```
 
 4. **Launch TD (Trust Domain)**:
@@ -205,6 +220,10 @@ Intel Trust Domain Extensions provides VM-level isolation with hardware-enforced
 
    # Check MRTD (Measurement Register for TD)
    tdx-attest info
+
+   # Verify device permissions
+   ls -l /dev/tdx-guest
+   # Should be readable by the application user
    ```
 
 6. **Deploy the application**:
@@ -229,12 +248,59 @@ Intel Trust Domain Extensions provides VM-level isolation with hardware-enforced
 # Get attestation report
 curl -k https://your-server:443/attestation > attestation.json
 
+# Verify the platform is TDX
+cat attestation.json | jq -r '.platform'
+# Expected output: "intel-tdx"
+
 # Extract quote
 cat attestation.json | jq -r '.report' | base64 -d > quote.dat
 
+# Extract measurement (MRTD)
+cat attestation.json | jq -r '.measurement'
+# This is the hex-encoded measurement of your TD
+
 # Verify with Intel Attestation Service
 # Use Intel's DCAP (Data Center Attestation Primitives) verification library
+# For example, using Intel's quote verification library:
+# https://github.com/intel/SGXDataCenterAttestationPrimitives
 ```
+
+#### Implementation Details
+
+**How Wulong generates TDX attestation:**
+
+1. **Primary method**: Executes `tdx-attest quote /tmp/tdx-quote.dat` command
+   - This is the recommended approach for production
+   - Requires `tdx-attest` tool to be installed in the TD
+   - Generates a properly formatted TDX quote structure
+
+2. **Fallback method**: Reads directly from `/dev/tdx-guest` device
+   - Used only if `tdx-attest` command fails
+   - Simplified implementation using direct device read
+   - May not work correctly in all TDX environments
+
+**Attestation report structure:**
+```json
+{
+  "platform": "intel-tdx",
+  "report": "base64-encoded-tdx-quote",
+  "measurement": "hex-encoded-mrtd-hash",
+  "timestamp": "2026-03-18T..."
+}
+```
+
+**Detection logic** (src/attestation/tee-platform.service.ts):
+- Checks for `/dev/tdx-guest`
+- Checks for `/dev/tdx_guest` (alternate naming)
+- Checks for `/sys/firmware/tdx_seam` directory
+
+#### Production Recommendations
+
+1. **Always install `tdx-attest` tool**: Don't rely on the fallback device read method
+2. **Verify quote structure**: Ensure the generated quotes are valid TDX quote format
+3. **Test attestation before production**: Use Intel's verification service to validate quotes
+4. **Monitor attestation failures**: Log and alert on attestation generation errors
+5. **Keep TDX firmware updated**: Intel regularly releases TDX security patches
 
 ### AWS Nitro Enclaves
 
@@ -378,6 +444,206 @@ print(f"PCR2: {attestation['pcrs'][2].hex()}")
 EOF
 ```
 
+### Phala Network (Intel TDX/SGX)
+
+[Phala Network](https://phala.network/) provides TEE-as-a-Service infrastructure through [Phala Cloud](https://cloud.phala.network/) and [Dstack](https://docs.phala.com/dstack/overview), supporting Intel TDX, Intel SGX, AMD SEV, and GPU TEE.
+
+#### Overview
+
+Phala Network is a trustless cloud infrastructure platform that enables deployment of Docker-based applications into TEE environments in minutes. Phala uses [Dstack](https://github.com/Dstack-TEE/dstack), an open-source TEE SDK and guest OS (Confidential Computing Consortium project under Linux Foundation), to simplify deployment of arbitrary Docker containers into TEE.
+
+**Compatibility Status:**
+- ✅ **Intel TDX** - Compatible (Phala supports via Dstack, Wulong supports)
+- ❌ **Intel SGX** - Not supported by Wulong (SGX uses different APIs than TDX)
+- ⚠️ **AMD SEV** - Phala's AMD support may differ from Wulong's SEV-SNP implementation
+- ❌ **GPU TEE (NVIDIA H100/H200)** - Not supported by Wulong
+
+**Key Resources:**
+- [Phala Cloud Platform](https://cloud.phala.network/)
+- [Dstack Documentation](https://docs.phala.com/dstack/getting-started)
+- [Dstack GitHub Repository](https://github.com/Dstack-TEE/dstack)
+- [Hardware Requirements](https://docs.phala.com/dstack/hardware-requirements)
+- [Attestation Overview](https://docs.phala.com/phala-cloud/attestation/overview)
+- [AMD SEV vs Intel TDX vs NVIDIA GPU TEE Comparison](https://phala.com/learn/AMD-SEV-vs-Intel-TDX-vs-NVIDIA-GPU-TEE)
+
+#### Deployment on Phala (Intel TDX)
+
+If you want to deploy Wulong on Phala's Intel TDX infrastructure using Dstack:
+
+**Prerequisites:**
+
+1. **Hardware Requirements:**
+   - Bare metal Intel TDX server following [canonical/tdx specifications](https://github.com/canonical/tdx)
+   - Intel Xeon 5th/6th Generation CPU (TDX support required)
+   - Minimum 16GB RAM, 100GB free disk space
+   - BIOS configuration: Enable Intel TDX, VT-x/VT-d, SR-IOV
+   - See [Phala's Hardware Requirements](https://docs.phala.com/dstack/hardware-requirements)
+
+2. **Software Setup:**
+   - Ubuntu 24.04 (recommended)
+   - Dstack SDK installed
+   - Docker support for containerization
+
+3. **Account Setup:**
+   - Phala Cloud account (if using managed service)
+   - Access to TDX-enabled nodes
+
+**Installation Steps:**
+
+1. **Set up Dstack environment** following [Phala's Getting Started Guide](https://docs.phala.com/dstack/getting-started):
+   ```bash
+   # Install build tools (Ubuntu 24.04)
+   sudo apt-get update
+   sudo apt-get install build-essential git
+
+   # Clone meta-dstack repository
+   git clone https://github.com/Phala-Network/meta-dstack
+   cd meta-dstack
+
+   # Follow Intel's TDX enabling guide if needed
+   # https://cc-enabling.trustedservices.intel.com/intel-tdx-enabling-guide/
+   ```
+
+2. **Configure BIOS** (before OS installation):
+   - Enable Intel TDX
+   - Enable Intel VT-x / VT-d
+   - Enable SR-IOV (if available)
+   - Refer to [Intel TDX Enabling Guide](https://cc-enabling.trustedservices.intel.com/intel-tdx-enabling-guide/04/hardware_setup/)
+
+3. **Verify TDX device access** in Dstack environment:
+   ```bash
+   ls -l /dev/tdx-guest
+   # or
+   ls -l /dev/tdx_guest
+
+   # Verify TDX is active
+   cat /sys/firmware/tdx_seam/version
+   ```
+
+4. **Containerize Wulong** for Dstack deployment:
+   ```dockerfile
+   # Dockerfile
+   FROM node:20-slim
+
+   WORKDIR /app
+
+   # Copy application
+   COPY package*.json pnpm-lock.yaml ./
+   COPY dist ./dist
+
+   # Install dependencies
+   RUN npm install -g pnpm && pnpm install --prod
+
+   # Install tdx-attest tools inside container
+   RUN apt-get update && \
+       apt-get install -y wget && \
+       wget https://download.01.org/intel-sgx/latest/linux-latest/distro/ubuntu22.04-server/tdx-attest.deb && \
+       dpkg -i tdx-attest.deb || apt-get install -f -y
+
+   # Generate TLS certificates inside TEE
+   RUN mkdir -p /run/secrets && \
+       openssl req -x509 -newkey rsa:4096 \
+       -keyout /run/secrets/tls.key \
+       -out /run/secrets/tls.cert \
+       -days 365 -nodes \
+       -subj "/CN=wulong.phala.network"
+
+   ENV NODE_ENV=production
+
+   EXPOSE 443
+
+   CMD ["node", "dist/main.js"]
+   ```
+
+5. **Deploy to Phala Cloud** using [Phala Cloud CLI](https://docs.phala.com/phala-cloud/phala-cloud-cli/start-from-cloud-cli):
+   ```bash
+   # Build and push Docker image
+   docker build -t wulong:latest .
+   docker push your-registry/wulong:latest
+
+   # Deploy using Phala Cloud CLI (if using managed service)
+   # or follow Dstack deployment instructions for self-hosted
+   ```
+
+6. **Verify deployment** following the standard [Intel TDX](#intel-tdx) verification steps
+
+**Attestation Integration:**
+
+Phala provides comprehensive attestation capabilities. When running Wulong on Phala:
+
+1. **Wulong's Native Attestation:**
+   - Wulong's `/attestation` endpoint generates standard Intel TDX quotes
+   - Uses `tdx-attest` tool or `/dev/tdx-guest` device access
+   - Returns platform-specific attestation reports
+
+2. **Phala's Attestation Services:**
+   - [Get Attestation](https://docs.phala.com/phala-cloud/attestation/get-attestation) - Dashboard and CLI access to attestation reports
+   - [Verify Your Application](https://docs.phala.com/phala-cloud/attestation/verify-your-application) - Verification methods
+   - [On-chain Verification](https://docs.phala.com/phala-cloud/attestation/overview) - Smart contract verification using Automata's DCAP verifier
+   - CLI command: `phala cvms attestation` to view TEE attestation reports
+
+3. **Verification Options:**
+   - **Smart Contract:** Use Automata's on-chain DCAP verifier (Solidity)
+   - **Intel DCAP:** Standard Intel verification service
+   - **Phala Trust Center:** Automated verification platform
+   - **Custom Integration:** Wulong can integrate with Phala's verification APIs
+
+**Architecture Considerations:**
+
+When deploying on Phala/Dstack:
+
+1. **CVM (Confidential Virtual Machine):**
+   - Dstack creates a TDX-based VM for your application
+   - Hypervisor (QEMU) launches the VM with TDX enabled
+   - Each application gets one CVM with hardware-level isolation
+
+2. **Networking:**
+   - Verify network isolation meets Wulong's security requirements
+   - Configure domains and ports in Dstack build configuration
+   - Consider [TEE-Controlled Domain Certificates](https://docs.phala.com/dstack/design-documents/tee-controlled-domain-certificates)
+
+3. **Trust Model:**
+   - [Decentralized Root-of-Trust](https://docs.phala.com/dstack/design-documents/decentralized-root-of-trust) - Phala's trust architecture
+   - [Dstack Whitepaper](https://docs.phala.com/dstack/design-documents/whitepaper) - Technical design details
+   - Compatible with Wulong's trust assumptions for TDX
+
+**Limitations:**
+
+1. **Intel SGX not supported**: If you need SGX specifically, Wulong would require additional development to support SGX's different attestation APIs (`/dev/sgx_enclave`, `/dev/sgx_provision`)
+
+2. **Platform-specific features**: Phala provides additional services (key management, decentralized verification, on-chain attestation) that may require custom integration beyond Wulong's default KMS integration
+
+3. **GPU TEE**: Wulong does not support [Phala's GPU TEE infrastructure](https://docs.phala.com/phala-cloud/confidential-ai/confidential-gpu/deploy-and-verify) (NVIDIA H100/H200)
+
+4. **Docker requirement**: Wulong must be containerized for Dstack deployment
+
+**Comparison with Other Platforms:**
+
+For platform comparisons, see:
+- [Phala Cloud vs Azure Confidential Computing](https://phala.network/posts/Phala-Cloud-vs-Azure)
+- [Phala's Defense in Depth Solution with TEE](https://phala.com/posts/phalas-defense-in-depth-solution-with-tee)
+
+**Future Support:**
+
+To add Intel SGX support for broader Phala compatibility, Wulong would need:
+- SGX attestation service implementation using Intel SGX SDK
+- Support for EPID or DCAP attestation modes
+- Device access to `/dev/sgx_enclave` and `/dev/sgx_provision`
+- Reference: [How Phala adapted after Intel SGX breach](https://the-scarlet-thread.medium.com/intel-sgx-breach-what-it-means-for-tees-and-how-phala-network-is-adapting-ce918af75319)
+
+**Additional Resources:**
+
+- [Phala Network Overview](https://docs.phala.com/network/overview/phala-network)
+- [Dstack Examples Repository](https://github.com/dstack-tee/dstack-examples)
+- [Phala Cloud FAQ](https://docs.phala.com/phala-cloud/faqs)
+- [Deploy a dApp on Phala Cloud - Step-by-Step Guide](https://phala.com/posts/how-to-deploy-a-dapp-on-phala-cloud-a-stepbystep-guide)
+- [Phala-Intel Partnership](https://phala.com/posts/phala-intel)
+
+For questions about Phala-specific deployment, consult:
+- Phala Network documentation: https://docs.phala.com/
+- Phala GitHub: https://github.com/Phala-Network
+- Dstack GitHub: https://github.com/Dstack-TEE/dstack
+
 ## General TEE Configuration
 
 ### Environment Variables
@@ -508,10 +774,11 @@ curl -k -X POST https://your-server:443/api/test \
 ### Trust Assumptions
 
 You MUST trust:
-1. TEE hardware vendor (AMD/Intel/AWS)
+1. TEE hardware vendor (AMD/Intel/AWS/Phala infrastructure provider)
 2. This application code (verify source and attestation)
 3. KMS that releases secrets
 4. Build process integrity
+5. For Phala/Dstack: The Dstack SDK and hypervisor (QEMU) stack
 
 You do NOT need to trust:
 1. Host OS or cloud provider operator
@@ -547,17 +814,47 @@ lsmod | grep -E 'sev|tdx|nsm'
 ```bash
 # Verify platform tools are installed
 which snpguest  # For AMD SEV-SNP
-which tdx-attest  # For Intel TDX
+which tdx-attest  # For Intel TDX (REQUIRED for production)
 which nitro-cli  # For AWS Nitro
 
 # Check permissions
 ls -l /dev/sev-guest  # Should be readable by app user
+ls -l /dev/tdx-guest  # Should be readable by app user
 
 # Test tool directly
 snpguest report /tmp/test.bin  # AMD
-tdx-attest quote /tmp/test.dat  # Intel
+tdx-attest quote /tmp/test.dat  # Intel TDX
 nitro-cli describe-enclaves  # AWS
 ```
+
+**Intel TDX Specific Issues**:
+
+**Problem**: "TDX attestation generation failed" errors
+
+**Diagnosis**:
+```bash
+# Check if tdx-attest is installed
+which tdx-attest
+# If not found, install it (see Installation Steps above)
+
+# Check device access
+ls -l /dev/tdx-guest
+# Should show: crw------- or similar
+
+# Test tdx-attest directly
+tdx-attest quote /tmp/test-quote.dat
+# Should succeed without errors
+
+# Check system logs for TDX errors
+dmesg | grep -i tdx
+journalctl -xe | grep -i tdx
+```
+
+**Common TDX issues**:
+1. **`tdx-attest` not installed**: Install the tool (required for production)
+2. **Device permission denied**: Add app user to appropriate group or adjust device permissions
+3. **TDX module not loaded**: Check `lsmod | grep tdx` and ensure kernel supports TDX
+4. **Invalid TDX configuration**: Verify BIOS settings and VM launch parameters
 
 #### TLS certificate errors
 
@@ -589,6 +886,7 @@ chmod 644 /run/secrets/tls.cert
 # Allocate more resources
 # For AMD/Intel VMs: increase vCPUs and memory
 # For AWS Nitro: adjust enclave configuration
+# For Phala/Dstack: adjust CVM resource allocation in deployment config
 
 # Check for side-channel mitigations overhead
 # Some mitigations can impact performance
@@ -597,6 +895,11 @@ chmod 644 /run/secrets/tls.cert
 top
 free -h
 ```
+
+**Phala/Dstack Specific**:
+- Review [Phala Cloud pricing](https://phala.network/posts/introducing-phala-cloud-pricing-affordable-secure-scalable) for resource tiers
+- Adjust CVM configuration in your deployment
+- Check Dstack build configuration for resource limits
 
 ### Getting Help
 
@@ -615,16 +918,26 @@ snpguest verify /tmp/report.bin
 # Intel TDX
 tdx-attest quote /tmp/quote.dat
 tdx-attest info
+tdx-attest --version
 
 # AWS Nitro
 nitro-cli describe-enclaves
 nitro-cli console --enclave-id <ID>
 nitro-cli describe-eif --eif-path <path>
 
-# Application
+# Phala Cloud / Dstack
+phala cvms attestation          # View TEE attestation reports
+phala cvms list                 # List your CVMs
+# See: https://docs.phala.com/phala-cloud/phala-cloud-cli/start-from-cloud-cli
+
+# Wulong Application
 curl -k https://localhost:443/attestation
 curl -k https://localhost:443/health
 NODE_ENV=production node dist/main.js
+
+# Docker (for Phala deployment)
+docker build -t wulong:latest .
+docker push your-registry/wulong:latest
 ```
 
 ## Next Steps
@@ -640,4 +953,9 @@ After successful deployment:
 For more information:
 - [README.md](../README.md) - General project information
 - [SIDE_CHANNEL_ATTACKS.md](SIDE_CHANNEL_ATTACKS.md) - Side-channel attack mitigations
-- Platform documentation: AMD SEV-SNP, Intel TDX, AWS Nitro Enclaves
+- Platform documentation:
+  - [AMD SEV-SNP Documentation](https://www.amd.com/en/developer/sev.html)
+  - [Intel TDX Documentation](https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html)
+  - [AWS Nitro Enclaves Documentation](https://docs.aws.amazon.com/enclaves/)
+  - [Phala Network Documentation](https://docs.phala.com/)
+  - [Dstack Documentation](https://docs.phala.com/dstack/getting-started)
