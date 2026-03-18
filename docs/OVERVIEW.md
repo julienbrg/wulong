@@ -57,7 +57,13 @@ Wulong follows a **zero-trust operator model**. Traditional API security relies 
 ## Key Features
 
 ### Attestation & Verification
-The `/attestation` endpoint exposes cryptographic evidence of the running code. Clients verify this evidence against known measurements before transmitting sensitive data. This creates a trustless verification model where code identity is proven mathematically rather than asserted.
+The `/chest/attestation` endpoint exposes cryptographic evidence of the running code. Clients verify this evidence against known measurements before transmitting sensitive data. This creates a trustless verification model where code identity is proven mathematically rather than asserted. The attestation proves that:
+
+1. **Code Integrity**: The exact code running in the TEE (via measurement/hash)
+2. **TEE Authenticity**: The service is actually running in a genuine TEE
+3. **No Privileged Access**: Even the operator cannot access user secrets
+
+Users can request attestation at any time to verify the service does what it claims - it cannot access their data.
 
 ### Web3 Authentication
 Sign-In with Ethereum (SIWE) provides decentralized authentication without traditional credentials. Users prove identity through cryptographic signatures, eliminating password management and centralized identity providers. See [docs/SIWE.md](docs/SIWE.md) for implementation details.
@@ -111,7 +117,7 @@ Sign-In with Ethereum (SIWE) provides decentralized authentication without tradi
 ### Data Flow
 
 1. **Client Request**: TLS connection established directly with enclave
-2. **Attestation**: Client verifies `/attestation` endpoint before sending sensitive data
+2. **Attestation**: Client verifies `/chest/attestation` endpoint before sending sensitive data
 3. **Authentication**: SIWE signature validated against Ethereum address
 4. **Processing**: Business logic executes within hardware-isolated memory
 5. **Response**: Encrypted response sent through TLS tunnel

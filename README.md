@@ -41,6 +41,34 @@ https://localhost:3000
 
 __Accept the self-signed certificate warning in your browser. Please note the 's' in 'https'.__
 
+## API Endpoints
+
+### Core Endpoints
+
+- **`GET /chest/attestation`** - Get TEE attestation proving the service cannot access user data
+  - Returns platform type, cryptographic report, code measurement, and timestamp
+  - Publicly accessible (no authentication required)
+  - Users verify the measurement matches published source code
+
+- **`POST /chest/store`** - Store a secret with owner-based access control
+  - Requires: `secret` (string) and `publicAddresses` (Ethereum addresses)
+  - Returns: unique `slot` identifier
+  - No authentication required for storing
+
+- **`GET /chest/access/:slot`** - Access a stored secret
+  - Requires: SIWE authentication via headers
+  - Returns: secret if authenticated address is an owner
+  - Protected by SIWE guard
+
+### Authentication & Health
+
+- **`POST /auth/nonce`** - Generate SIWE nonce for authentication
+- **`GET /health`** - Health check endpoint
+- **`GET /health/ready`** - Readiness probe
+- **`GET /health/live`** - Liveness probe
+
+See the Swagger documentation at `https://localhost:3000` for complete API details.
+
 ## Docs
 
 - [**Overview**](docs/OVERVIEW.md) - Complete project overview, features, installation, and API endpoints

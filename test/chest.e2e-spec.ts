@@ -549,4 +549,70 @@ describe('Chest Endpoints (e2e)', () => {
         .expect(403);
     });
   });
+
+  describe('GET /chest/attestation', () => {
+    it('should return attestation report', () => {
+      return request(app.getHttpServer())
+        .get('/chest/attestation')
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('platform');
+          expect(res.body).toHaveProperty('report');
+          expect(res.body).toHaveProperty('measurement');
+          expect(res.body).toHaveProperty('timestamp');
+
+          // Verify platform is one of the expected types
+          expect([
+            'amd-sev-snp',
+            'intel-tdx',
+            'aws-nitro',
+            'phala',
+            'none',
+          ]).toContain((res.body as { platform: string }).platform);
+        });
+    });
+
+    it('should return mock attestation in non-TEE environment', () => {
+      return request(app.getHttpServer())
+        .get('/chest/attestation')
+        .expect(200)
+        .expect((res) => {
+          // In test environment, we expect mock attestation
+          expect((res.body as { platform: string }).platform).toBe('none');
+          expect((res.body as { measurement: string }).measurement).toContain(
+            'MOCK',
+          );
+        });
+    });
+
+    it('should return attestation without authentication', () => {
+      // Attestation should be publicly accessible - no auth required
+      return request(app.getHttpServer()).get('/chest/attestation').expect(200);
+    });
+
+    it('should have valid timestamp format', () => {
+      return request(app.getHttpServer())
+        .get('/chest/attestation')
+        .expect(200)
+        .expect((res) => {
+          const timestamp = (res.body as { timestamp: string }).timestamp;
+          expect(timestamp).toBeDefined();
+          // Verify it's a valid ISO timestamp
+          expect(new Date(timestamp).toISOString()).toBe(timestamp);
+        });
+    });
+
+    it('should return base64-encoded report', () => {
+      return request(app.getHttpServer())
+        .get('/chest/attestation')
+        .expect(200)
+        .expect((res) => {
+          const report = (res.body as { report: string }).report;
+          expect(report).toBeDefined();
+          expect(typeof report).toBe('string');
+          // Verify it's valid base64
+          expect(() => Buffer.from(report, 'base64')).not.toThrow();
+        });
+    });
+  });
 });

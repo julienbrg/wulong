@@ -8,6 +8,8 @@ import { isAddress } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
+import { TeePlatformService } from '../attestation/tee-platform.service';
+import { AttestationResponseDto } from './dto/attestation-response.dto';
 
 interface SecretEntry {
   secret: string;
@@ -25,7 +27,7 @@ interface SecretData {
 export class SecretService {
   private readonly secretPath: string;
 
-  constructor() {
+  constructor(private readonly teePlatformService: TeePlatformService) {
     this.secretPath = path.join(process.cwd(), 'chest.json');
   }
 
@@ -117,6 +119,24 @@ export class SecretService {
     }
 
     return entry.secret;
+  }
+
+  /**
+   * Generates a TEE attestation report proving the code running and platform integrity.
+   * Users can verify the measurement matches the published source code to ensure
+   * the service cannot access their secrets.
+   * @returns Attestation report with platform, measurement, and cryptographic proof
+   */
+  async getAttestation(): Promise<AttestationResponseDto> {
+    const attestation =
+      await this.teePlatformService.generateAttestationReport();
+    return {
+      platform: attestation.platform,
+      report: attestation.report,
+      measurement: attestation.measurement,
+      timestamp: attestation.timestamp,
+      publicKey: attestation.publicKey,
+    };
   }
 
   /**

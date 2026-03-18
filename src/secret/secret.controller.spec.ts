@@ -17,6 +17,7 @@ describe('SecretController', () => {
   const mockSecretService = {
     store: jest.fn(),
     access: jest.fn(),
+    getAttestation: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -258,6 +259,67 @@ describe('SecretController', () => {
       expect(mockSecretService.access).toHaveBeenCalledWith(
         slot,
         checksummedAddress,
+      );
+    });
+  });
+
+  describe('getAttestation', () => {
+    it('should return attestation report', async () => {
+      const mockAttestation = {
+        platform: 'amd-sev-snp' as const,
+        report: 'base64-encoded-report',
+        measurement: 'abc123measurement',
+        timestamp: '2026-03-18T10:30:00.000Z',
+        publicKey: '0x1234567890abcdef',
+      };
+
+      mockSecretService.getAttestation.mockResolvedValue(mockAttestation);
+
+      const result = await controller.getAttestation();
+
+      expect(result).toEqual(mockAttestation);
+      expect(mockSecretService.getAttestation).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle attestation from Intel TDX', async () => {
+      const mockAttestation = {
+        platform: 'intel-tdx' as const,
+        report: 'tdx-quote-base64',
+        measurement: 'def456measurement',
+        timestamp: '2026-03-18T10:35:00.000Z',
+      };
+
+      mockSecretService.getAttestation.mockResolvedValue(mockAttestation);
+
+      const result = await controller.getAttestation();
+
+      expect(result).toEqual(mockAttestation);
+      expect(result.platform).toBe('intel-tdx');
+    });
+
+    it('should handle mock attestation in non-TEE environment', async () => {
+      const mockAttestation = {
+        platform: 'none' as const,
+        report: 'mock-attestation',
+        measurement: 'MOCK_MEASUREMENT_NOT_SECURE',
+        timestamp: '2026-03-18T10:40:00.000Z',
+      };
+
+      mockSecretService.getAttestation.mockResolvedValue(mockAttestation);
+
+      const result = await controller.getAttestation();
+
+      expect(result).toEqual(mockAttestation);
+      expect(result.platform).toBe('none');
+    });
+
+    it('should propagate errors from service', async () => {
+      mockSecretService.getAttestation.mockRejectedValue(
+        new Error('Failed to generate attestation'),
+      );
+
+      await expect(controller.getAttestation()).rejects.toThrow(
+        'Failed to generate attestation',
       );
     });
   });

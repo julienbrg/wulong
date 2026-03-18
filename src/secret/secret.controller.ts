@@ -19,6 +19,7 @@ import { SiweGuard } from '../auth/siwe.guard';
 import { StoreRequestDto } from './dto/store-request.dto';
 import { StoreResponseDto } from './dto/store-response.dto';
 import { AccessResponseDto } from './dto/access-response.dto';
+import { AttestationResponseDto } from './dto/attestation-response.dto';
 
 @ApiTags('App')
 @Controller('chest')
@@ -90,5 +91,26 @@ export class SecretController {
   ): Promise<AccessResponseDto> {
     const secret = await this.secretService.access(slot, req.user.address);
     return { secret };
+  }
+
+  @Get('attestation')
+  @ApiOperation({
+    summary: 'Get TEE attestation',
+    description:
+      'Returns a cryptographic attestation proving that this service is running in a genuine TEE ' +
+      'and showing the measurement (hash) of the code. Users can verify the measurement matches ' +
+      'the published source code to ensure the service cannot access their secrets.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Attestation report generated successfully',
+    type: AttestationResponseDto,
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Failed to generate attestation report',
+  })
+  async getAttestation(): Promise<AttestationResponseDto> {
+    return await this.secretService.getAttestation();
   }
 }
