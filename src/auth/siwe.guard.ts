@@ -9,7 +9,7 @@ import { SiweService } from './siwe.service';
 /**
  * SIWE authentication guard
  * Expects SIWE message and signature in request headers:
- * - X-SIWE-Message: The SIWE message string
+ * - X-SIWE-Message: The SIWE message string (base64 encoded)
  * - X-SIWE-Signature: The signature hex string
  */
 @Injectable()
@@ -22,14 +22,17 @@ export class SiweGuard implements CanActivate {
       user?: { address: string };
     }>();
 
-    const message = request.headers['x-siwe-message'];
+    const encodedMessage = request.headers['x-siwe-message'];
     const signature = request.headers['x-siwe-signature'];
 
-    if (!message || !signature) {
+    if (!encodedMessage || !signature) {
       throw new UnauthorizedException(
         'Missing SIWE authentication headers (x-siwe-message, x-siwe-signature)',
       );
     }
+
+    // Decode base64 message
+    const message = Buffer.from(encodedMessage, 'base64').toString('utf-8');
 
     const address = await this.siweService.verifySignature(message, signature);
 

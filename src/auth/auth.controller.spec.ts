@@ -32,7 +32,8 @@ describe('AuthController', () => {
       expect(result).toHaveProperty('issuedAt');
       expect(result).toHaveProperty('expiresAt');
       expect(typeof result.nonce).toBe('string');
-      expect(result.nonce.length).toBe(64); // 32 bytes hex = 64 chars
+      expect(result.nonce.length).toBeGreaterThanOrEqual(8); // SIWE requires at least 8 alphanumeric characters
+      expect(result.nonce).toMatch(/^[A-Za-z0-9]+$/); // Alphanumeric only
     });
 
     it('should generate unique nonces', () => {

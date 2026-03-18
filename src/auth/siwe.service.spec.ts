@@ -19,9 +19,9 @@ describe('SiweService', () => {
   });
 
   describe('generateNonce', () => {
-    it('should generate a 64-character hex string', () => {
+    it('should generate an alphanumeric string (at least 8 characters)', () => {
       const nonce = service.generateNonce();
-      expect(nonce).toMatch(/^[0-9a-f]{64}$/);
+      expect(nonce).toMatch(/^[A-Za-z0-9]{8,}$/);
     });
 
     it('should generate unique nonces', () => {
@@ -80,8 +80,7 @@ describe('SiweService', () => {
         uri: 'https://localhost:3000',
         version: '1',
         chainId: 1,
-        nonce:
-          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', // Valid hex but non-existent
+        nonce: 'nonExistentNonce123', // Valid format but non-existent
         issuedAt: new Date().toISOString(),
       });
 

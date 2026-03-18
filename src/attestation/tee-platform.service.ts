@@ -115,9 +115,12 @@ export class TeePlatformService {
         timestamp: timestamp || new Date().toISOString(),
       };
     } catch (error) {
-      this.logger.error(
-        `Failed to generate SEV-SNP attestation: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      // Only log errors in non-test environments for cleaner test output
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.error(
+          `Failed to generate SEV-SNP attestation: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       throw new Error('SEV-SNP attestation generation failed', {
         cause: error,
       });
@@ -170,9 +173,12 @@ export class TeePlatformService {
         timestamp: timestamp || new Date().toISOString(),
       };
     } catch (error) {
-      this.logger.error(
-        `Failed to generate TDX attestation: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      // Only log errors in non-test environments for cleaner test output
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.error(
+          `Failed to generate TDX attestation: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       throw new Error('TDX attestation generation failed', { cause: error });
     }
   }
@@ -240,9 +246,12 @@ export class TeePlatformService {
         timestamp: timestamp || new Date().toISOString(),
       };
     } catch (error) {
-      this.logger.error(
-        `Failed to generate Nitro attestation: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      // Only log errors in non-test environments for cleaner test output
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.error(
+          `Failed to generate Nitro attestation: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       throw new Error('Nitro attestation generation failed', { cause: error });
     }
   }

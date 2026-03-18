@@ -20,7 +20,7 @@ export class AppController {
   })
   @ApiHeader({
     name: 'x-siwe-message',
-    description: 'The SIWE message string',
+    description: 'The SIWE message string (base64 encoded)',
     required: true,
   })
   @ApiHeader({
