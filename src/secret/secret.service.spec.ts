@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { SecretService } from './secret.service';
 import { TeePlatformService } from '../attestation/tee-platform.service';
+import { MlKemEncryptionService } from '../encryption/mlkem-encryption.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ethers from 'ethers';
@@ -34,6 +35,13 @@ describe('SecretService', () => {
     isInTee: jest.fn(),
   };
 
+  const mockMlKemEncryptionService = {
+    decrypt: jest.fn(),
+    encrypt: jest.fn(),
+    getPublicKey: jest.fn(),
+    isAvailable: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -41,6 +49,10 @@ describe('SecretService', () => {
         {
           provide: TeePlatformService,
           useValue: mockTeePlatformService,
+        },
+        {
+          provide: MlKemEncryptionService,
+          useValue: mockMlKemEncryptionService,
         },
       ],
     }).compile();

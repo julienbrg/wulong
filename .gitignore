@@ -52,3 +52,4 @@ secrets/
 .tmp
 temp/
 tmp/
+chest.json

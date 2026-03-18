@@ -65,20 +65,33 @@ The `/chest/attestation` endpoint exposes cryptographic evidence of the running 
 
 Users can request attestation at any time to verify the service does what it claims - it cannot access their data.
 
+### Quantum-Resistant Encryption
+ML-KEM-1024 (NIST FIPS 203) provides post-quantum cryptographic protection for client-side encryption. Clients encrypt secrets before transmission using the admin's public key exposed in attestation. The TEE decrypts with a private key that never leaves enclave memory. This ensures:
+
+1. **Quantum resistance**: Protected against Shor's algorithm (breaks RSA/ECDSA)
+2. **Admin-proof encryption**: Private key only in TEE memory, never on disk/logs
+3. **Client verification**: ML-KEM public key comes with attestation proof
+4. **End-to-end security**: Plaintext never leaves client until inside TEE
+
+See [docs/CLIENT_ENCRYPTION.md](CLIENT_ENCRYPTION.md) for implementation guide.
+
 ### Web3 Authentication
-Sign-In with Ethereum (SIWE) provides decentralized authentication without traditional credentials. Users prove identity through cryptographic signatures, eliminating password management and centralized identity providers. See [docs/SIWE.md](docs/SIWE.md) for implementation details.
+Sign-In with Ethereum (SIWE) provides decentralized authentication without traditional credentials. Users prove identity through cryptographic signatures, eliminating password management and centralized identity providers. Owner-based access control ensures only authorized Ethereum addresses can retrieve secrets. See [docs/SIWE.md](docs/SIWE.md) for implementation details.
 
 ### Confidentiality Controls
 - **Sanitized logging**: Structured log filtering prevents accidental data leakage
 - **TLS-in-enclave**: Network plaintext never touches host infrastructure
 - **KMS integration**: Secrets provisioned post-attestation, not at deploy time
 - **Input validation**: Schema-based request validation prevents injection attacks
+- **ML-KEM encryption**: Quantum-resistant client-side encryption with TEE-only decryption
 
 ### Operational Features
 - Rate limiting and DoS protection
 - Health check endpoints for orchestration systems
 - Swagger/OpenAPI documentation generation
 - Platform-agnostic TEE detection at runtime
+- Keypair generation utilities for ML-KEM
+- Comprehensive API reference documentation
 
 ## System Architecture
 
