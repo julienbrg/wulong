@@ -109,7 +109,7 @@ describe('SiweGuard', () => {
 
       const mockRequest = {
         headers: {
-          'x-siwe-message': 'message',
+          'x-siwe-message': Buffer.from('message').toString('base64'),
           'x-siwe-signature': '0x123',
         },
       };

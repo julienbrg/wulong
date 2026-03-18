@@ -7,9 +7,9 @@ import { SecretsService } from './config/secrets.service';
 import { AttestationController } from './attestation/attestation.controller';
 import { TeePlatformService } from './attestation/tee-platform.service';
 import { HealthController } from './health/health.controller';
-import { AuthController } from './auth/auth.controller';
-import { SiweService } from './auth/siwe.service';
 import { validateEnvironment } from './config/env.validation';
+import { SecretModule } from './secret/secret.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -25,14 +25,11 @@ import { validateEnvironment } from './config/env.validation';
         limit: 10, // 10 requests per minute per IP
       },
     ]),
+    AuthModule,
+    SecretModule,
   ],
-  controllers: [
-    AppController,
-    AttestationController,
-    HealthController,
-    AuthController,
-  ],
-  providers: [AppService, SecretsService, TeePlatformService, SiweService],
-  exports: [SecretsService, TeePlatformService, SiweService],
+  controllers: [AppController, AttestationController, HealthController],
+  providers: [AppService, SecretsService, TeePlatformService],
+  exports: [SecretsService, TeePlatformService],
 })
 export class AppModule {}

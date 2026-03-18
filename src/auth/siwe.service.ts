@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SiweMessage } from 'siwe';
-import { randomBytes } from 'crypto';
+import { SiweMessage, generateNonce } from 'siwe';
 
 interface NonceEntry {
   nonce: string;
@@ -20,7 +19,7 @@ export class SiweService {
    * Nonces are stored in-memory only (no persistence)
    */
   generateNonce(): string {
-    const nonce = randomBytes(32).toString('hex');
+    const nonce = generateNonce();
 
     this.nonces.set(nonce, {
       nonce,
