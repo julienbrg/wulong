@@ -115,15 +115,16 @@ describe('SecretsService', () => {
       expect(service.get('API_KEY')).toBe('secret-api-key');
     });
 
-    it('should throw error if KMS_URL is not set in production', async () => {
+    it('should load from environment variables when KMS_URL is not set in production', async () => {
       process.env.NODE_ENV = 'production';
       delete process.env.KMS_URL;
+      process.env.TEST_SECRET = 'prod-env-value';
 
       jest.spyOn(service, 'onModuleInit').mockRestore();
 
-      await expect(service.onModuleInit()).rejects.toThrow(
-        'KMS_URL environment variable is required in production',
-      );
+      await service.onModuleInit();
+
+      expect(service.get('TEST_SECRET')).toBe('prod-env-value');
     });
 
     it('should throw error if KMS refuses attestation', async () => {

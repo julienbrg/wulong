@@ -10,17 +10,14 @@ import { TeeExceptionFilter } from './filters/tee-exception.filter';
 async function bootstrap() {
   const isProd = process.env.NODE_ENV === 'production';
 
-  const httpsOptions = isProd
+  // HTTPS only in dev with self-signed certs
+  // Production uses HTTP behind Phala's TLS termination proxy
+  const httpsOptions = !isProd
     ? {
-        // In production these come from inside the enclave, not the host
-        key: fs.readFileSync('/run/secrets/tls.key'),
-        cert: fs.readFileSync('/run/secrets/tls.cert'),
-      }
-    : {
-        // Dev only — self-signed cert from ./secrets/
         key: fs.readFileSync('./secrets/tls.key'),
         cert: fs.readFileSync('./secrets/tls.cert'),
-      };
+      }
+    : undefined;
 
   const app = await NestFactory.create(AppModule, {
     httpsOptions,
@@ -60,11 +57,12 @@ async function bootstrap() {
   // Graceful shutdown handling
   app.enableShutdownHooks();
 
-  const port = isProd ? 443 : 3000;
+  const port = 3000;
   await app.listen(port);
 
   // Log startup only in dev mode (production logger filters this out)
-  console.log(`Application is running on: https://localhost:${port}`);
+  const protocol = isProd ? 'http' : 'https';
+  console.log(`Application is running on: ${protocol}://localhost:${port}`);
 }
 
 void bootstrap();
