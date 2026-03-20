@@ -182,7 +182,7 @@ NONCE=$(curl -k -X POST https://localhost:3000/auth/nonce | jq -r '.nonce')
 # localhost wants you to sign in with your Ethereum account:
 # 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb
 #
-# URI: http://localhost:3000
+# URI: https://localhost:3000
 # Version: 1
 # Chain ID: 1
 # Nonce: <NONCE>
@@ -213,7 +213,7 @@ const { nonce } = await fetch('https://localhost:3000/auth/nonce', {
 const siweMessage = new SiweMessage({
   domain: 'localhost',
   address: walletAddress,
-  uri: 'http://localhost:3000',
+  uri: 'https://localhost:3000',
   version: '1',
   chainId: 1,
   nonce: nonce,
@@ -286,7 +286,7 @@ curl -k -X POST https://localhost:3000/auth/nonce
 localhost wants you to sign in with your Ethereum account:
 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb
 
-URI: http://localhost:3000
+URI: https://localhost:3000
 Version: 1
 Chain ID: 1
 Nonce: 1a2b3c4d5e6f7890

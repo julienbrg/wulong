@@ -20,7 +20,19 @@ export class SecretsService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     if (process.env.NODE_ENV === 'production') {
-      await this.loadFromKms();
+      // In Phala Cloud TEE, encrypted secrets are injected as env vars
+      // Only fetch from KMS if explicitly configured
+      if (process.env.KMS_URL && !process.env.ADMIN_MLKEM_PUBLIC_KEY) {
+        await this.loadFromKms();
+      } else {
+        // Load from environment (encrypted secrets in TEE)
+        this.logger.log('Loading secrets from TEE environment variables');
+        Object.entries(process.env).forEach(([key, value]) => {
+          if (value !== undefined) {
+            this.secrets.set(key, value);
+          }
+        });
+      }
     } else {
       // Dev: fall back to process.env (never do this in production)
       this.logger.warn('DEV MODE: loading secrets from process.env');

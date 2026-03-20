@@ -18,51 +18,87 @@ A NestJS API designed to run inside a Trusted Execution Environment (TEE), givin
 - Zero-trust security model (see [overview](docs/OVERVIEW.md))
 - [TypeScript](https://www.typescriptlang.org/) with [NestJS](https://nestjs.com/)
 
-## Install
+## Quick Start
+
+### Local Development (without Docker)
 
 ```bash
-pnpm i
-```
+# Install dependencies
+pnpm install
 
-## Run
-
-Copy environment template:
-```bash
+# Setup environment
 cp .env.template .env
-```
 
-Generate self-signed TLS certificates:
-```bash
+# Generate TLS certificates
 mkdir -p secrets
 openssl req -x509 -newkey rsa:4096 -keyout secrets/tls.key -out secrets/tls.cert -days 365 -nodes -subj "/CN=localhost"
-```
 
-Generate ML-KEM-1024 keypair:
-```bash
-node scripts/generate-mlkem-keypair.mjs
-```
+# Generate ML-KEM keypair
+pnpm ts-node scripts/generate-admin-keypair.ts
+# Copy the output keys to your .env file
 
-> ⚠️ The private key will be stored in `secrets/mlkem.key`. Never commit this file!
-
-Start the dev server:
-```bash
+# Start development server
 pnpm start:dev
 ```
 
-Access the API documentation:
-```
-https://localhost:3000
+Access at `https://localhost:3000` (accept self-signed certificate warning)
+
+### Docker Development
+
+```bash
+docker compose -f docker-compose.dev.yml up
 ```
 
-__Accept the self-signed certificate warning in your browser. Please note the 's' in 'https'.__
+Access at `https://localhost:3000`
+
+### Phala Cloud (Production TEE)
+
+```bash
+# Build and push Docker image
+docker buildx build --platform linux/amd64 -t YOUR_USERNAME/wulong:latest --push .
+
+# Deploy to Phala Cloud
+phala deploy --interactive
+```
+
+## Modes
+
+Wulong can run in three different modes:
+
+1. **[Local (without Docker)](docs/LOCAL_SETUP.md)** - Best for development and debugging
+   - Hot reload with `pnpm start:dev`
+   - HTTPS with self-signed certificates
+   - Direct access to logs and debugging tools
+
+2. **[Local (with Docker)](docs/DOCKER.md)** - Best for testing deployment configurations
+   - Development mode with volume mounting and hot reload
+   - Production mode with optimized multi-stage builds
+   - Consistent environment across different machines
+
+3. **[Phala Cloud (TEE)](docs/PHALA_CONFIG.md)** - Best for production with hardware-backed security
+   - Intel TDX Trusted Execution Environment
+   - End-to-end encrypted secrets
+   - Full attestation support
+   - TLS termination by Phala
 
 ## Docs
 
+### Setup & Deployment
+
+- [**Local Setup**](docs/LOCAL_SETUP.md) - Run locally without Docker (development)
+- [**Docker Setup**](docs/DOCKER.md) - Run with Docker (development & testing)
+- [**Phala Deployment**](docs/PHALA_CONFIG.md) - Deploy to Phala Cloud TEE (production)
+
+### API & Usage
+
 - [**API Reference**](docs/API_REFERENCE.md) - Complete REST API endpoint documentation
-- [**Overview**](docs/OVERVIEW.md) - Project overview, architecture, and security model
 - [**Client-Side Encryption**](docs/CLIENT_ENCRYPTION.md) - Quantum-resistant ML-KEM encryption guide
-- [**TEE Setup**](docs/TEE_SETUP.md) - Platform-specific deployment (AMD SEV-SNP, Intel TDX, AWS Nitro, Phala)
 - [**SIWE Authentication**](docs/SIWE.md) - Ethereum wallet authentication guide
+
+### Architecture & Security
+
+- [**Overview**](docs/OVERVIEW.md) - Project overview, architecture, and security model
+- [**TEE Setup**](docs/TEE_SETUP.md) - Platform-specific deployment (AMD SEV-SNP, Intel TDX, AWS Nitro, Phala)
 - [**Side Channel Attacks**](docs/SIDE_CHANNEL_ATTACKS.md) - Security considerations and mitigations
 
 ## License

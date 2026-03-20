@@ -5,7 +5,7 @@ This guide walks you through manually testing the `store` and `access` endpoints
 ## Prerequisites
 
 - Development server running: `npm run start:dev`
-- Swagger UI available at: http://localhost:3000/api
+- Swagger UI available at: https://localhost:3000
 - Node.js installed (for generating SIWE headers)
 
 ## Test Wallet
@@ -21,7 +21,7 @@ For testing purposes, use Hardhat's default test account:
 
 ### Step 1: Store a Secret
 
-1. Open http://localhost:3000/api in your browser
+1. Open https://localhost:3000 in your browser
 2. Find **POST /chest/store** and expand it
 3. Click **"Try it out"**
 4. Use this example request body:
@@ -91,7 +91,7 @@ const wallet = new Wallet('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae7
 const siweMessage = new SiweMessage({
   domain: 'localhost',
   address: wallet.address,
-  uri: 'http://localhost:3000',
+  uri: 'https://localhost:3000',
   version: '1',
   chainId: 1,
   nonce: nonce,
