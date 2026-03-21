@@ -3,8 +3,11 @@ version: '3.8'
 services:
   wulong:
     image: julienberanger/wulong:latest
+    pull_policy: always
     ports:
       - "3000:3000"
+    volumes:
+      - /var/run/dstack.sock:/var/run/dstack.sock
     environment:
       - NODE_ENV=${NODE_ENV}
       - KMS_URL=${KMS_URL}

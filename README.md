@@ -8,7 +8,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js)](https://nodejs.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-A NestJS API designed to run inside a Trusted Execution Environment (TEE), giving users cryptographic guarantees that the operator cannot access their data during processing.
+A NestJS API designed to run inside a Trusted Execution Environment (TEE), giving users cryptographic guarantees that the operator cannot access their data during processing. Optimized for [Phala Network](https://phala.network/) deployment.
 
 ## Features
 
@@ -63,23 +63,32 @@ phala deploy --interactive
 
 ## Modes
 
-Wulong can run in three different modes:
+Wulong can run in four different modes:
 
 1. **[Local (without Docker)](docs/LOCAL_SETUP.md)** - Best for development and debugging
    - Hot reload with `pnpm start:dev`
    - HTTPS with self-signed certificates
    - Direct access to logs and debugging tools
+   - Mock TEE attestation (no real hardware security)
 
 2. **[Local (with Docker)](docs/DOCKER.md)** - Best for testing deployment configurations
    - Development mode with volume mounting and hot reload
    - Production mode with optimized multi-stage builds
    - Consistent environment across different machines
+   - Mock TEE attestation (no real hardware security)
 
-3. **[Phala Cloud (TEE)](docs/PHALA_CONFIG.md)** - Best for production with hardware-backed security
+3. **Standard (without TEE)** - Classic VPS deployment (e.g., Ubuntu on Infomaniak)
+   - Deploy with PM2 on standard cloud infrastructure
+   - No hardware attestation (`platform: "none"`)
+   - Suitable when TEE guarantees are not required
+   - Standard production setup with HTTPS reverse proxy
+
+4. **[Phala Cloud (TEE)](docs/PHALA_CONFIG.md)** - Production with hardware-backed security (recommended)
    - Intel TDX Trusted Execution Environment
    - End-to-end encrypted secrets
-   - Full attestation support
+   - Full attestation support (`platform: "intel-tdx"`)
    - TLS termination by Phala
+   - Cryptographic proof of code integrity
 
 ## Docs
 

@@ -218,8 +218,11 @@ version: '3.8'
 services:
   wulong:
     image: julienberanger/wulong:latest
+    pull_policy: always
     ports:
       - "3000:3000"
+    volumes:
+      - /var/run/dstack.sock:/var/run/dstack.sock  # Required for TEE attestation on Phala
     environment:
       - NODE_ENV=${NODE_ENV}
       - KMS_URL=${KMS_URL}
@@ -227,6 +230,8 @@ services:
       - ADMIN_MLKEM_PRIVATE_KEY=${ADMIN_MLKEM_PRIVATE_KEY}
     restart: unless-stopped
 ```
+
+**Note**: The `/var/run/dstack.sock` volume mount is required when deploying to Phala Network or other DStack-based TEE infrastructure. Without it, the application will run in mock mode.
 
 ## Troubleshooting
 
@@ -293,6 +298,22 @@ This means the Docker image was built for the wrong architecture. Rebuild with:
 ```bash
 docker buildx build --platform linux/amd64 -t wulong:latest .
 ```
+
+### TEE attestation returns "platform": "none"
+
+If deploying to Phala Network and attestation shows mock mode:
+
+1. **Add volume mount** to docker-compose.yml:
+   ```yaml
+   volumes:
+     - /var/run/dstack.sock:/var/run/dstack.sock
+   ```
+
+2. **Verify instance type** is TEE-enabled (e.g., `tdx.small`)
+
+3. **Redeploy** with updated configuration
+
+See [PHALA_CONFIG.md](./PHALA_CONFIG.md#troubleshooting) for detailed TEE troubleshooting.
 
 ## Performance Considerations
 
