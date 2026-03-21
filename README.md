@@ -77,11 +77,11 @@ Wulong can run in four different modes:
    - Consistent environment across different machines
    - Mock TEE attestation (no real hardware security)
 
-3. **[Standard (without TEE)](docs/DOCKER.md)** - Production deployment without TEE hardware
-   - Production-ready configuration
-   - No hardware attestation available (`platform: "none"`)
-   - Suitable for environments where TEE is not required
-   - Uses standard server infrastructure
+3. **Standard (without TEE)** - Classic VPS deployment (e.g., Ubuntu on Infomaniak)
+   - Deploy with PM2 on standard cloud infrastructure
+   - No hardware attestation (`platform: "none"`)
+   - Suitable when TEE guarantees are not required
+   - Standard production setup with HTTPS reverse proxy
 
 4. **[Phala Cloud (TEE)](docs/PHALA_CONFIG.md)** - Production with hardware-backed security (recommended)
    - Intel TDX Trusted Execution Environment
