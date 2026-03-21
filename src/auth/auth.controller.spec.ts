@@ -49,7 +49,8 @@ describe('AuthController', () => {
       const expiresAt = new Date(result.expiresAt);
       const diffMs = expiresAt.getTime() - issuedAt.getTime();
 
-      expect(diffMs).toBe(5 * 60 * 1000); // 5 minutes
+      expect(diffMs).toBeGreaterThanOrEqual(5 * 60 * 1000); // At least 5 minutes
+      expect(diffMs).toBeLessThan(5 * 60 * 1000 + 10); // Allow small timing variance
     });
   });
 });

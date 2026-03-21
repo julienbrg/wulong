@@ -2,9 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TeePlatformService } from './tee-platform.service';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
+import { DstackClient } from '@phala/dstack-sdk';
 
 jest.mock('fs');
 jest.mock('child_process');
+jest.mock('@phala/dstack-sdk');
 
 describe('TeePlatformService', () => {
   let service: TeePlatformService;
@@ -449,6 +451,124 @@ describe('TeePlatformService', () => {
       service = module.get<TeePlatformService>(TeePlatformService);
 
       expect(service.getPlatform()).toBe('intel-tdx');
+    });
+
+    it('should detect Phala environment via dstack.sock', async () => {
+      (fs.existsSync as jest.Mock).mockImplementation((path: string) => {
+        return path === '/var/run/dstack.sock';
+      });
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [TeePlatformService],
+      }).compile();
+
+      service = module.get<TeePlatformService>(TeePlatformService);
+
+      expect(service.getPlatform()).toBe('intel-tdx');
+    });
+
+    it('should detect Phala environment via tappd.sock', async () => {
+      (fs.existsSync as jest.Mock).mockImplementation((path: string) => {
+        return path === '/var/run/tappd.sock';
+      });
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [TeePlatformService],
+      }).compile();
+
+      service = module.get<TeePlatformService>(TeePlatformService);
+
+      expect(service.getPlatform()).toBe('intel-tdx');
+    });
+  });
+
+  describe('Phala TDX attestation', () => {
+    beforeEach(async () => {
+      (fs.existsSync as jest.Mock).mockImplementation((path: string) => {
+        return path === '/var/run/dstack.sock';
+      });
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [TeePlatformService],
+      }).compile();
+
+      service = module.get<TeePlatformService>(TeePlatformService);
+    });
+
+    it('should generate Phala TDX attestation successfully', async () => {
+      const mockQuote = '0x' + 'ab'.repeat(160); // Mock hex quote
+      const mockGetQuote = jest.fn().mockResolvedValue({ quote: mockQuote });
+
+      // Mock DstackClient constructor
+      (
+        DstackClient as jest.MockedClass<typeof DstackClient>
+      ).mockImplementation(() => {
+        return {
+          getQuote: mockGetQuote,
+        } as unknown as DstackClient;
+      });
+
+      const result = await service.generateAttestationReport();
+
+      expect(result.platform).toBe('intel-tdx');
+      expect(result.report).toBeDefined();
+      expect(result.measurement).toBeDefined();
+      expect(mockGetQuote).toHaveBeenCalled();
+    });
+
+    it('should handle Phala TDX attestation with user data', async () => {
+      const userData = Buffer.from('test-data'.padEnd(64, '0'));
+      const mockQuote = '0x' + 'ab'.repeat(160);
+      const mockGetQuote = jest.fn().mockResolvedValue({ quote: mockQuote });
+
+      (
+        DstackClient as jest.MockedClass<typeof DstackClient>
+      ).mockImplementation(() => {
+        return {
+          getQuote: mockGetQuote,
+        } as unknown as DstackClient;
+      });
+
+      const result = await service.generateAttestationReport(userData);
+
+      expect(result.platform).toBe('intel-tdx');
+      expect(mockGetQuote).toHaveBeenCalledWith(userData.subarray(0, 64));
+    });
+
+    it('should handle quote without 0x prefix', async () => {
+      const mockQuote = 'ab'.repeat(160); // Without 0x prefix
+      const mockGetQuote = jest.fn().mockResolvedValue({ quote: mockQuote });
+
+      (
+        DstackClient as jest.MockedClass<typeof DstackClient>
+      ).mockImplementation(() => {
+        return {
+          getQuote: mockGetQuote,
+        } as unknown as DstackClient;
+      });
+
+      const result = await service.generateAttestationReport();
+
+      expect(result.platform).toBe('intel-tdx');
+      expect(result.report).toBeDefined();
+    });
+
+    it('should throw error when Phala TDX attestation fails', async () => {
+      const mockGetQuote = jest
+        .fn()
+        .mockRejectedValue(new Error('Connection failed'));
+
+      (
+        DstackClient as jest.MockedClass<typeof DstackClient>
+      ).mockImplementation(() => {
+        return {
+          getQuote: mockGetQuote,
+        } as unknown as DstackClient;
+      });
+
+      await expect(service.generateAttestationReport()).rejects.toThrow(
+        'Phala TDX attestation generation failed',
+      );
     });
   });
 });
