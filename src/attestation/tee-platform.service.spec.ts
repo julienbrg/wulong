@@ -231,6 +231,10 @@ describe('TeePlatformService', () => {
   describe('TDX attestation', () => {
     beforeEach(async () => {
       (fs.existsSync as jest.Mock).mockImplementation((path: string) => {
+        // Return false for Phala sockets, true for TDX device
+        if (path === '/var/run/dstack.sock' || path === '/var/run/tappd.sock') {
+          return false;
+        }
         return path === '/dev/tdx-guest';
       });
 
@@ -249,7 +253,13 @@ describe('TeePlatformService', () => {
       (fs.readFileSync as jest.Mock).mockReturnValue(mockReport);
       (fs.writeFileSync as jest.Mock).mockReturnValue(undefined);
       (fs.unlinkSync as jest.Mock).mockReturnValue(undefined);
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.existsSync as jest.Mock).mockImplementation((path: string) => {
+        // Return false for Phala sockets, true for everything else in TDX tests
+        if (path === '/var/run/dstack.sock' || path === '/var/run/tappd.sock') {
+          return false;
+        }
+        return true;
+      });
 
       const result = await service.generateAttestationReport();
 
@@ -269,7 +279,13 @@ describe('TeePlatformService', () => {
       (fs.readFileSync as jest.Mock).mockReturnValue(mockReport);
       (fs.writeFileSync as jest.Mock).mockReturnValue(undefined);
       (fs.unlinkSync as jest.Mock).mockReturnValue(undefined);
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.existsSync as jest.Mock).mockImplementation((path: string) => {
+        // Return false for Phala sockets, true for everything else in TDX tests
+        if (path === '/var/run/dstack.sock' || path === '/var/run/tappd.sock') {
+          return false;
+        }
+        return true;
+      });
 
       const result = await service.generateAttestationReport(userData);
 

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
+import { DstackClient } from '@phala/dstack-sdk';
 
 export interface AttestationReport {
   platform: 'amd-sev-snp' | 'intel-tdx' | 'aws-nitro' | 'none';
@@ -28,12 +29,20 @@ export class TeePlatformService {
    * Detects which TEE platform we're running on.
    */
   private detectPlatform(): AttestationReport['platform'] {
+    // Check for Phala DStack (Intel TDX via Unix socket)
+    if (
+      fs.existsSync('/var/run/dstack.sock') ||
+      fs.existsSync('/var/run/tappd.sock')
+    ) {
+      return 'intel-tdx'; // Phala uses Intel TDX
+    }
+
     // Check for AMD SEV-SNP
     if (fs.existsSync('/dev/sev-guest') || fs.existsSync('/dev/sev')) {
       return 'amd-sev-snp';
     }
 
-    // Check for Intel TDX
+    // Check for Intel TDX (native/non-Phala)
     if (
       fs.existsSync('/dev/tdx-guest') ||
       fs.existsSync('/dev/tdx_guest') ||
@@ -68,6 +77,11 @@ export class TeePlatformService {
           this.generateSevSnpAttestation(userData, timestamp),
         );
       case 'intel-tdx':
+        // Check if running on Phala
+        if (this.isPhalaEnvironment()) {
+          return await this.generatePhalaTdxAttestation(userData, timestamp);
+        }
+        // Otherwise use native TDX
         return await Promise.resolve(
           this.generateTdxAttestation(userData, timestamp),
         );
@@ -122,6 +136,65 @@ export class TeePlatformService {
         );
       }
       throw new Error('SEV-SNP attestation generation failed', {
+        cause: error,
+      });
+    }
+  }
+
+  /**
+   * Detects if we're running in Phala environment
+   */
+  private isPhalaEnvironment(): boolean {
+    return (
+      fs.existsSync('/var/run/dstack.sock') ||
+      fs.existsSync('/var/run/tappd.sock')
+    );
+  }
+
+  /**
+   * Intel TDX attestation using Phala DStack SDK
+   */
+  private async generatePhalaTdxAttestation(
+    userData?: Buffer,
+    timestamp?: string,
+  ): Promise<AttestationReport> {
+    try {
+      const client = new DstackClient();
+
+      // DstackClient.getQuote() accepts max 64 bytes of raw data
+      // If userData is provided, use it; otherwise use timestamp
+      const reportData =
+        userData?.subarray(0, 64) ||
+        Buffer.from(timestamp || new Date().toISOString()).subarray(0, 64);
+
+      // Get TDX quote from Phala
+      const response = await client.getQuote(reportData);
+
+      // Parse the quote response (quote is a hex string)
+      // Convert hex to buffer then to base64 for consistency with other platforms
+      const quoteHex = response.quote.startsWith('0x')
+        ? response.quote.slice(2)
+        : response.quote;
+      const quoteBuffer = Buffer.from(quoteHex, 'hex');
+
+      // Extract measurement from TDX quote
+      // TDX quote structure: https://download.01.org/intel-sgx/latest/dcap-latest/linux/docs/Intel_TDX_DCAP_Quoting_Library_API.pdf
+      // MRTD is at offset 112, 48 bytes
+      const measurement = quoteBuffer.subarray(112, 160).toString('hex');
+
+      return {
+        platform: 'intel-tdx',
+        report: quoteBuffer.toString('base64'),
+        measurement,
+        timestamp: timestamp || new Date().toISOString(),
+      };
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.error(
+          `Failed to generate Phala TDX attestation: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      throw new Error('Phala TDX attestation generation failed', {
         cause: error,
       });
     }
