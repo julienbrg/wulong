@@ -77,7 +77,9 @@ export class MlKemEncryptionService {
         `Public key: ${publicKeyBase64.substring(0, 32)}... (${this.publicKey.length} bytes)`,
       );
     } catch (error) {
-      this.logger.error('Failed to load ML-KEM keys:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.error('Failed to load ML-KEM keys:', error);
+      }
       throw error;
     }
   }
@@ -136,7 +138,9 @@ export class MlKemEncryptionService {
 
       return decrypted.toString('utf-8');
     } catch (error) {
-      this.logger.error('Decryption failed:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.error('Decryption failed:', error);
+      }
       throw new Error('Failed to decrypt data', { cause: error });
     }
   }

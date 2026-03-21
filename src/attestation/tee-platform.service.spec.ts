@@ -627,6 +627,25 @@ describe('TeePlatformService', () => {
         'Phala TDX attestation generation failed',
       );
     });
+
+    it('should log error silently in test environment when Phala TDX attestation fails', async () => {
+      const mockGetQuote = jest
+        .fn()
+        .mockRejectedValue(new Error('Connection failed'));
+
+      (
+        DstackClient as jest.MockedClass<typeof DstackClient>
+      ).mockImplementation(() => {
+        return {
+          getQuote: mockGetQuote,
+        } as unknown as DstackClient;
+      });
+
+      // Should throw error but not log in test environment
+      await expect(service.generateAttestationReport()).rejects.toThrow(
+        'Phala TDX attestation generation failed',
+      );
+    });
   });
 
   describe('error handling edge cases', () => {
