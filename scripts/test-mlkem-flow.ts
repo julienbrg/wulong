@@ -129,7 +129,7 @@ async function testMLKEMFlow() {
 
   // Step 3: Client encrypts secret (simulating w3pk)
   console.log('3️⃣  Client: Encrypting secret for TEE...');
-  const plaintext = 'This is my quantum-safe secret! 🔐';
+  const plaintext = '苟全性命於亂世，不求聞達於諸侯。';
   console.log(`  📝 Plaintext: "${plaintext}"`);
   const encrypted = await encryptForTEE(plaintext, attestation.mlkemPublicKey);
   console.log(`  ✅ Encrypted payload ready\n`);

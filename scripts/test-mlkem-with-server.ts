@@ -45,7 +45,7 @@ interface EncryptedPayload {
  */
 async function encryptMultiRecipient(
   plaintext: string,
-  recipientPublicKeys: string[]
+  recipientPublicKeys: string[],
 ): Promise<EncryptedPayload> {
   const mlkem = await createMlKem1024();
 
@@ -67,7 +67,9 @@ async function encryptMultiRecipient(
 
     // Validate public key size
     if (publicKey.length !== 1568) {
-      throw new Error(`Invalid ML-KEM public key size: ${publicKey.length} (expected 1568)`);
+      throw new Error(
+        `Invalid ML-KEM public key size: ${publicKey.length} (expected 1568)`,
+      );
     }
 
     // Encapsulate to get shared secret
@@ -103,12 +105,14 @@ async function encryptMultiRecipient(
 async function decryptMultiRecipient(
   payload: EncryptedPayload,
   privateKeyBase64: string,
-  publicKeyBase64: string
+  publicKeyBase64: string,
 ): Promise<string> {
   const mlkem = await createMlKem1024();
 
   // Find recipient entry by public key
-  const recipientEntry = payload.recipients.find(r => r.publicKey === publicKeyBase64);
+  const recipientEntry = payload.recipients.find(
+    (r) => r.publicKey === publicKeyBase64,
+  );
   if (!recipientEntry) {
     throw new Error('Public key not found in recipients list');
   }
@@ -153,39 +157,53 @@ async function testMLKEMWithServer() {
   try {
     const attestationResponse = await fetch(`${serverUrl}/chest/attestation`);
     if (!attestationResponse.ok) {
-      throw new Error(`Server returned ${attestationResponse.status}: ${await attestationResponse.text()}`);
+      throw new Error(
+        `Server returned ${attestationResponse.status}: ${await attestationResponse.text()}`,
+      );
     }
 
     const attestation: AttestationResponse = await attestationResponse.json();
 
     if (!attestation.mlkemPublicKey) {
-      throw new Error('Server did not return ML-KEM public key. Check .env configuration.');
+      throw new Error(
+        'Server did not return ML-KEM public key. Check .env configuration.',
+      );
     }
 
     console.log(`  ✅ Platform: ${attestation.platform}`);
-    console.log(`  ✅ ML-KEM Public Key: ${attestation.mlkemPublicKey.substring(0, 32)}... (${Buffer.from(attestation.mlkemPublicKey, 'base64').length} bytes)`);
+    console.log(
+      `  ✅ ML-KEM Public Key: ${attestation.mlkemPublicKey.substring(0, 32)}... (${Buffer.from(attestation.mlkemPublicKey, 'base64').length} bytes)`,
+    );
     console.log(`  ⚠️  Measurement: ${attestation.measurement}`);
-    console.log(`     (In production, VERIFY this matches published source code!)\n`);
+    console.log(
+      `     (In production, VERIFY this matches published source code!)\n`,
+    );
 
     // Step 2: Generate client ML-KEM keypair
     console.log('2️⃣  Generating client ML-KEM keypair...');
     const mlkem = await createMlKem1024();
     const [clientPublicKey, clientPrivateKey] = mlkem.generateKeyPair();
-    const clientPublicKeyBase64 = Buffer.from(clientPublicKey).toString('base64');
-    const clientPrivateKeyBase64 = Buffer.from(clientPrivateKey).toString('base64');
-    console.log(`  ✅ Client public key: ${clientPublicKeyBase64.substring(0, 32)}... (${clientPublicKey.length} bytes)\n`);
+    const clientPublicKeyBase64 =
+      Buffer.from(clientPublicKey).toString('base64');
+    const clientPrivateKeyBase64 =
+      Buffer.from(clientPrivateKey).toString('base64');
+    console.log(
+      `  ✅ Client public key: ${clientPublicKeyBase64.substring(0, 32)}... (${clientPublicKey.length} bytes)\n`,
+    );
 
     // Step 3: Encrypt secret for client + server
-    const plaintext = 'This is my super secret data! 🔐 Testing multi-recipient ML-KEM encryption.';
+    const plaintext = '苟全性命於亂世，不求聞達於諸侯。';
     console.log('3️⃣  Encrypting secret for client + server...');
     console.log(`  📝 Plaintext: "${plaintext}"`);
 
-    const encrypted = await encryptMultiRecipient(
-      plaintext,
-      [clientPublicKeyBase64, attestation.mlkemPublicKey]
-    );
+    const encrypted = await encryptMultiRecipient(plaintext, [
+      clientPublicKeyBase64,
+      attestation.mlkemPublicKey,
+    ]);
 
-    console.log(`  ✅ Encrypted with ${encrypted.recipients.length} recipients`);
+    console.log(
+      `  ✅ Encrypted with ${encrypted.recipients.length} recipients`,
+    );
     console.log(`     - Client can decrypt (privacy-first!)`);
     console.log(`     - Server can decrypt (for operations)\n`);
 
@@ -217,7 +235,7 @@ async function testMLKEMWithServer() {
     const clientDecrypted = await decryptMultiRecipient(
       encrypted,
       clientPrivateKeyBase64,
-      clientPublicKeyBase64
+      clientPublicKeyBase64,
     );
 
     console.log(`  📝 Decrypted: "${clientDecrypted}"`);
@@ -231,15 +249,21 @@ async function testMLKEMWithServer() {
     // Step 6: Server-side decryption (via API)
     console.log('6️⃣  Server-side decryption (with SIWE auth)...');
     console.log(`  ⚠️  Note: SIWE authentication required in production`);
-    console.log(`     For this test, we\'ll access without auth (if allowed)\n`);
+    console.log(
+      `     For this test, we\'ll access without auth (if allowed)\n`,
+    );
 
     // In production, you'd need SIWE headers:
     // 'x-siwe-message': base64(siweMessage)
     // 'x-siwe-signature': signatureHex
     // For testing without auth, the endpoint might be unprotected or need dev mode
 
-    console.log('  ℹ️  Server decryption test skipped (requires SIWE authentication)');
-    console.log('     The server CAN decrypt using its private key when properly authenticated.\n');
+    console.log(
+      '  ℹ️  Server decryption test skipped (requires SIWE authentication)',
+    );
+    console.log(
+      '     The server CAN decrypt using its private key when properly authenticated.\n',
+    );
 
     // Step 7: Summary
     console.log('📊 Test Summary:');
@@ -249,14 +273,15 @@ async function testMLKEMWithServer() {
     console.log('  ✅ Data encrypted at rest (quantum-safe)');
     console.log('  ⚠️  Server-side decryption requires SIWE auth\n');
 
-    console.log('🎉 All tests passed! ML-KEM multi-recipient encryption is working correctly.\n');
+    console.log(
+      '🎉 All tests passed! ML-KEM multi-recipient encryption is working correctly.\n',
+    );
 
     console.log('📋 Next Steps:');
     console.log('  1. Test with w3pk client for full SIWE integration');
     console.log('  2. Verify attestation in production (critical!)');
     console.log('  3. Deploy to Phala Network for hardware TEE security');
     console.log('  4. Implement client-side attestation verification\n');
-
   } catch (error) {
     console.error('\n❌ Test failed:', error);
     console.error('\nTroubleshooting:');

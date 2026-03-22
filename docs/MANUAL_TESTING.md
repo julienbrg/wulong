@@ -27,7 +27,7 @@ For testing purposes, use Hardhat's default test account:
 4. Use this example request body:
    ```json
    {
-     "secret": "my-super-secret-data",
+     "secret": "苟全性命於亂世，不求聞達於諸侯。",
      "publicAddresses": ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"]
    }
    ```
@@ -142,7 +142,7 @@ Wallet address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 **Expected Response (200):**
 ```json
 {
-  "secret": "my-super-secret-data"
+  "secret": "苟全性命於亂世，不求聞達於諸侯。"
 }
 ```
 

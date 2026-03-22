@@ -88,7 +88,7 @@ Wulong implements **multi-recipient ML-KEM encryption**, allowing multiple parti
 ```typescript
 // Client side (using w3pk)
 const encrypted = await w3pk.mlkemEncrypt(
-  'my secret data',
+  '苟全性命於亂世，不求聞達於諸侯。',
   [serverPublicKey]  // Server as recipient
 );
 // Client is automatically added as first recipient
@@ -588,7 +588,7 @@ async function testWulongMLKEM() {
   console.log(`\n👤 Client Address: ${await w3pk.getAddress('STANDARD')}`);
 
   // 3. Encrypt secret for yourself + server
-  const plaintext = 'My super secret data! 🔐';
+  const plaintext = '苟全性命於亂世，不求聞達於諸侯。';
   console.log(`\n📝 Plaintext: "${plaintext}"`);
 
   const encrypted = await w3pk.mlkemEncrypt(

@@ -127,7 +127,7 @@ const mlkem = await createMlKem1024();
 // Your secret data
 const plaintext = JSON.stringify({
   apiKey: 'sk-1234567890',
-  password: 'super-secret-password',
+  password: '苟全性命於亂世，不求聞達於諸侯。',
   metadata: 'any additional data'
 });
 

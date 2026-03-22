@@ -138,7 +138,7 @@ async function testStoreAndAccess() {
     console.log(`  ✅ Generated (1568 bytes)\n`);
 
     // Step 3: Encrypt secret
-    const plaintext = '🔐 My quantum-safe secret data! Testing store+access flow.';
+    const plaintext = '苟全性命於亂世，不求聞達於諸侯。';
     console.log('3️⃣  Encrypting secret for client + server...');
     console.log(`  📝 Plaintext: "${plaintext}"`);
 
