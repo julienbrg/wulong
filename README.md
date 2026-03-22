@@ -12,11 +12,19 @@ A NestJS API designed to run inside a Trusted Execution Environment (TEE), givin
 
 ## Features
 
-- Quantum-resistant encryption ([ML-KEM-1024](https://csrc.nist.gov/pubs/fips/203/final), see [client guide](docs/CLIENT_ENCRYPTION.md))
-- TEE attestation ([AMD SEV-SNP](https://www.amd.com/en/developer/sev.html), [Intel TDX](https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html), [AWS Nitro](https://aws.amazon.com/ec2/nitro/), [Phala](https://phala.network/), see [setup guide](docs/TEE_SETUP.md))
-- Web3 authentication ([SIWE](https://login.xyz), see [auth guide](docs/SIWE.md))
-- Zero-trust security model (see [overview](docs/OVERVIEW.md))
-- [TypeScript](https://www.typescriptlang.org/) with [NestJS](https://nestjs.com/)
+- **Quantum-Resistant Encryption** - [ML-KEM-1024](https://csrc.nist.gov/pubs/fips/203/final) (NIST FIPS 203) with multi-recipient support
+  - Client-side encryption with [w3pk](https://github.com/w3hc/w3pk)
+  - Privacy-first: clients can decrypt locally without server
+  - Server-side decryption for operations (with SIWE auth)
+  - See [ML-KEM guide](docs/MLKEM.md) and [client guide](docs/CLIENT_ENCRYPTION.md)
+- **TEE Attestation** - Cryptographic proof of code integrity
+  - Platforms: [AMD SEV-SNP](https://www.amd.com/en/developer/sev.html), [Intel TDX](https://www.intel.com/content/www/us/en/developer/tools/trust-domain-extensions/overview.html), [AWS Nitro](https://aws.amazon.com/ec2/nitro/), [Phala](https://phala.network/)
+  - See [TEE setup guide](docs/TEE_SETUP.md)
+- **Web3 Authentication** - [SIWE](https://login.xyz) (Sign-In with Ethereum)
+  - See [auth guide](docs/SIWE.md)
+- **Zero-Trust Security** - Admin cannot access encrypted data
+  - See [overview](docs/OVERVIEW.md)
+- **Modern Stack** - [TypeScript](https://www.typescriptlang.org/) + [NestJS](https://nestjs.com/)
 
 ## Quick Start
 
@@ -101,14 +109,17 @@ Wulong can run in four different modes:
 ### API & Usage
 
 - [**API Reference**](docs/API_REFERENCE.md) - Complete REST API endpoint documentation
-- [**Client-Side Encryption**](docs/CLIENT_ENCRYPTION.md) - Quantum-resistant ML-KEM encryption guide
+- [**ML-KEM Encryption**](docs/MLKEM.md) - **⭐ Quantum-resistant encryption guide (start here)**
+- [**Client-Side Encryption**](docs/CLIENT_ENCRYPTION.md) - How to encrypt data with w3pk
 - [**SIWE Authentication**](docs/SIWE.md) - Ethereum wallet authentication guide
+- [**Testing Guide**](docs/MLKEM_TESTING_GUIDE.md) - Local and Phala testing procedures
 
 ### Architecture & Security
 
 - [**Overview**](docs/OVERVIEW.md) - Project overview, architecture, and security model
 - [**TEE Setup**](docs/TEE_SETUP.md) - Platform-specific deployment (AMD SEV-SNP, Intel TDX, AWS Nitro, Phala)
 - [**Side Channel Attacks**](docs/SIDE_CHANNEL_ATTACKS.md) - Security considerations and mitigations
+- [**Implementation Plan**](docs/MLKEM_IMPLEMENTATION_PLAN.md) - ML-KEM development roadmap
 
 ## License
 

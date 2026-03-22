@@ -28,9 +28,12 @@ export class SecretController {
 
   @Post('store')
   @ApiOperation({
-    summary: 'Store a secret',
+    summary: 'Store a multi-recipient encrypted secret',
     description:
-      'Stores a secret and returns a unique slot identifier. The secret can only be accessed by the specified public addresses.',
+      'Stores a multi-recipient ML-KEM encrypted secret (from w3pk.mlkemEncrypt) and returns a unique slot identifier. ' +
+      'The encrypted payload must include the server as one of the recipients (use mlkemPublicKey from /chest/attestation). ' +
+      'Access is controlled via SIWE authentication (publicAddresses). ' +
+      'CRITICAL: Verify attestation before encrypting!',
   })
   @ApiResponse({
     status: 201,
@@ -39,7 +42,8 @@ export class SecretController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Invalid request - empty secret or invalid addresses',
+    description:
+      'Invalid request - invalid encrypted payload, missing recipients, or invalid addresses',
   })
   async store(@Body() dto: StoreRequestDto): Promise<StoreResponseDto> {
     const slot = await this.secretService.store(
@@ -53,10 +57,13 @@ export class SecretController {
   @UseGuards(SiweGuard)
   @ApiSecurity('SIWE')
   @ApiOperation({
-    summary: 'Access a secret',
+    summary: 'Access a secret (server-side decryption)',
     description:
-      'Retrieves a secret if the authenticated caller is one of the owners. ' +
-      'Requires SIWE authentication via X-SIWE-Message and X-SIWE-Signature headers.',
+      'Retrieves and decrypts a secret if the authenticated caller is one of the owners. ' +
+      'Server performs ML-KEM decryption using its private key (one of the recipients). ' +
+      'Returns plaintext secret. ' +
+      'Requires SIWE authentication via X-SIWE-Message and X-SIWE-Signature headers. ' +
+      'NOTE: Client can also decrypt locally using w3pk.mlkemDecrypt without involving the server.',
   })
   @ApiHeader({
     name: 'x-siwe-message',
@@ -70,8 +77,13 @@ export class SecretController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Secret retrieved successfully',
+    description: 'Secret decrypted successfully (plaintext)',
     type: AccessResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad request - ML-KEM decryption failed or server not in recipients list',
   })
   @ApiResponse({
     status: 401,
@@ -95,15 +107,16 @@ export class SecretController {
 
   @Get('attestation')
   @ApiOperation({
-    summary: 'Get TEE attestation',
+    summary: 'Get TEE attestation with ML-KEM public key',
     description:
-      'Returns a cryptographic attestation proving that this service is running in a genuine TEE ' +
-      'and showing the measurement (hash) of the code. Users can verify the measurement matches ' +
-      'the published source code to ensure the service cannot access their secrets.',
+      'Returns a cryptographic attestation proving that this service is running in a genuine TEE, ' +
+      "along with the server's ML-KEM-1024 public key for quantum-resistant encryption. " +
+      'CRITICAL: Clients MUST verify the attestation before encrypting data! ' +
+      'Use the mlkemPublicKey to encrypt secrets with w3pk.mlkemEncrypt([serverPublicKey]).',
   })
   @ApiResponse({
     status: 200,
-    description: 'Attestation report generated successfully',
+    description: 'Attestation report with ML-KEM public key',
     type: AttestationResponseDto,
   })
   @ApiResponse({
