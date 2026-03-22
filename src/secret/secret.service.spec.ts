@@ -40,6 +40,29 @@ describe('SecretService', () => {
     encrypt: jest.fn(),
     getPublicKey: jest.fn(),
     isAvailable: jest.fn(),
+    decryptMultiRecipient: jest.fn(),
+  };
+
+  // Helper to create a valid encrypted payload
+  const createMockEncryptedPayload = (publicKey?: string) => {
+    // Create 1600 bytes of data (1568 KEM + 32 encrypted AES key)
+    const ciphertextBytes = Buffer.alloc(1600);
+    // Fill with some data
+    for (let i = 0; i < 1600; i++) {
+      ciphertextBytes[i] = i % 256;
+    }
+
+    return {
+      recipients: [
+        {
+          publicKey: publicKey || Buffer.alloc(1568, 'a').toString('base64'),
+          ciphertext: ciphertextBytes.toString('base64'),
+        },
+      ],
+      encryptedData: Buffer.alloc(100, 'e').toString('base64'),
+      iv: Buffer.alloc(12, 'i').toString('base64'),
+      authTag: Buffer.alloc(16, 't').toString('base64'),
+    };
   };
 
   beforeEach(async () => {
@@ -87,13 +110,15 @@ describe('SecretService', () => {
           return hexPart.length === 40 && /^[0-9a-fA-F]+$/.test(hexPart);
         },
       );
+      // Mock ML-KEM encryption service availability
+      mockMlKemEncryptionService.isAvailable.mockReturnValue(true);
     });
 
     it('should store a secret and return a slot', async () => {
-      const secret = 'my-secret';
+      const encryptedPayload = createMockEncryptedPayload();
       const publicAddresses = ['0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c'];
 
-      const slot = await service.store(secret, publicAddresses);
+      const slot = await service.store(encryptedPayload, publicAddresses);
 
       expect(slot).toBeDefined();
       expect(typeof slot).toBe('string');
@@ -105,56 +130,64 @@ describe('SecretService', () => {
       );
     });
 
-    it('should throw BadRequestException if secret is empty', async () => {
+    it('should throw BadRequestException if payload is invalid', async () => {
       await expect(
-        service.store('', ['0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c']),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        service.store(null as any, [
+          '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
+        ]),
       ).rejects.toThrow(BadRequestException);
 
       await expect(
-        service.store('   ', ['0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c']),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        service.store({ recipients: [] } as any, [
+          '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
+        ]),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException if publicAddresses is empty', async () => {
-      await expect(service.store('my-secret', [])).rejects.toThrow(
+      const encryptedPayload = createMockEncryptedPayload();
+      await expect(service.store(encryptedPayload, [])).rejects.toThrow(
         BadRequestException,
       );
     });
 
     it('should throw BadRequestException for invalid Ethereum address', async () => {
+      const encryptedPayload = createMockEncryptedPayload();
       await expect(
-        service.store('my-secret', ['invalid-address']),
+        service.store(encryptedPayload, ['invalid-address']),
       ).rejects.toThrow(BadRequestException);
 
-      await expect(service.store('my-secret', ['0x123'])).rejects.toThrow(
+      await expect(service.store(encryptedPayload, ['0x123'])).rejects.toThrow(
         BadRequestException,
       );
     });
 
     it('should accept multiple valid Ethereum addresses', async () => {
-      const secret = 'my-secret';
+      const encryptedPayload = createMockEncryptedPayload();
       const publicAddresses = [
         '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
         '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
       ];
 
-      const slot = await service.store(secret, publicAddresses);
+      const slot = await service.store(encryptedPayload, publicAddresses);
 
       expect(slot).toBeDefined();
       expect(fs.promises.writeFile).toHaveBeenCalled();
     });
 
     it('should normalize addresses to lowercase', async () => {
-      const secret = 'my-secret';
+      const encryptedPayload = createMockEncryptedPayload();
       const publicAddresses = ['0xBFBAA5A59E3B6C06AFF9C975092B8705F804FA1C'];
 
-      await service.store(secret, publicAddresses);
+      await service.store(encryptedPayload, publicAddresses);
 
       const writeCall = (fs.promises.writeFile as jest.Mock).mock
         .calls[0] as unknown[];
       const writtenData = JSON.parse(writeCall[1] as string) as Record<
         string,
-        { secret: string; publicAddresses: string[] }
+        { encryptedPayload: any; publicAddresses: string[] }
       >;
       const slots = Object.values(writtenData);
 
@@ -164,9 +197,10 @@ describe('SecretService', () => {
     });
 
     it('should load existing chest data before storing', async () => {
+      const existingPayload = createMockEncryptedPayload();
       const existingData = {
         existingSlot: {
-          secret: 'existing-secret',
+          encryptedPayload: existingPayload,
           publicAddresses: ['0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c'],
         },
       };
@@ -176,10 +210,10 @@ describe('SecretService', () => {
         .spyOn(fs.promises, 'readFile')
         .mockResolvedValue(JSON.stringify(existingData));
 
-      const secret = 'new-secret';
+      const newPayload = createMockEncryptedPayload();
       const publicAddresses = ['0x70997970C51812dc3A010C7d01b50e0d17dc79C8'];
 
-      await service.store(secret, publicAddresses);
+      await service.store(newPayload, publicAddresses);
 
       const writeCall = (fs.promises.writeFile as jest.Mock).mock
         .calls[0] as unknown[];
@@ -198,11 +232,37 @@ describe('SecretService', () => {
         .spyOn(fs.promises, 'writeFile')
         .mockRejectedValue(new Error('Write error'));
 
+      const encryptedPayload = createMockEncryptedPayload();
       await expect(
-        service.store('my-secret', [
+        service.store(encryptedPayload, [
           '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
         ]),
       ).rejects.toThrow('Failed to save secret');
+    });
+
+    it('should throw BadRequestException when ML-KEM encryption is not available', async () => {
+      mockMlKemEncryptionService.isAvailable.mockReturnValue(false);
+      const encryptedPayload = createMockEncryptedPayload();
+
+      await expect(
+        service.store(encryptedPayload, [
+          '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
+        ]),
+      ).rejects.toThrow(
+        'ML-KEM encryption not configured on server. Contact administrator.',
+      );
+    });
+
+    it('should throw BadRequestException for invalid ciphertext size', async () => {
+      const invalidPayload = createMockEncryptedPayload();
+      invalidPayload.recipients[0].ciphertext =
+        Buffer.alloc(100).toString('base64'); // Invalid size
+
+      await expect(
+        service.store(invalidPayload, [
+          '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
+        ]),
+      ).rejects.toThrow(/Invalid ML-KEM ciphertext size/);
     });
   });
 
@@ -212,9 +272,10 @@ describe('SecretService', () => {
     const testSecret = 'my-secret';
 
     beforeEach(() => {
+      const mockEncryptedPayload = createMockEncryptedPayload();
       const mockData = {
         [testSlot]: {
-          secret: testSecret,
+          encryptedPayload: mockEncryptedPayload,
           publicAddresses: [testAddress.toLowerCase()],
         },
       };
@@ -232,6 +293,12 @@ describe('SecretService', () => {
           const hexPart = address.slice(2);
           return hexPart.length === 40 && /^[0-9a-fA-F]+$/.test(hexPart);
         },
+      );
+      // Mock ML-KEM encryption service availability
+      mockMlKemEncryptionService.isAvailable.mockReturnValue(true);
+      // Mock decryption
+      mockMlKemEncryptionService.decryptMultiRecipient.mockResolvedValue(
+        testSecret,
       );
     });
 
@@ -284,9 +351,10 @@ describe('SecretService', () => {
       const address1 = '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c';
       const address2 = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
 
+      const mockEncryptedPayload = createMockEncryptedPayload();
       const mockData = {
         [testSlot]: {
-          secret: testSecret,
+          encryptedPayload: mockEncryptedPayload,
           publicAddresses: [address1.toLowerCase(), address2.toLowerCase()],
         },
       };
@@ -320,6 +388,36 @@ describe('SecretService', () => {
         NotFoundException,
       );
     });
+
+    it('should throw BadRequestException when ML-KEM encryption is not available during access', async () => {
+      mockMlKemEncryptionService.isAvailable.mockReturnValue(false);
+
+      await expect(service.access(testSlot, testAddress)).rejects.toThrow(
+        'ML-KEM encryption not configured on server',
+      );
+    });
+
+    it('should throw BadRequestException if decryption fails', async () => {
+      mockMlKemEncryptionService.decryptMultiRecipient.mockImplementation(
+        () => {
+          throw new Error('Decryption failed');
+        },
+      );
+
+      await expect(service.access(testSlot, testAddress)).rejects.toThrow(
+        /Failed to decrypt secret/,
+      );
+    });
+
+    it('should handle ENOENT error when loading secret', async () => {
+      const enoentError = new Error('File not found') as NodeJS.ErrnoException;
+      enoentError.code = 'ENOENT';
+      jest.spyOn(fs.promises, 'readFile').mockRejectedValue(enoentError);
+
+      await expect(service.access(testSlot, testAddress)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
   });
 
   describe('edge cases', () => {
@@ -334,6 +432,8 @@ describe('SecretService', () => {
           return hexPart.length === 40 && /^[0-9a-fA-F]+$/.test(hexPart);
         },
       );
+      // Mock ML-KEM encryption service availability
+      mockMlKemEncryptionService.isAvailable.mockReturnValue(true);
     });
 
     it('should handle checksummed Ethereum addresses', async () => {
@@ -342,43 +442,59 @@ describe('SecretService', () => {
 
       // This is a checksummed address (mixed case)
       const checksummedAddress = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed';
+      const encryptedPayload = createMockEncryptedPayload();
 
-      const slot = await service.store('secret', [checksummedAddress]);
+      const slot = await service.store(encryptedPayload, [checksummedAddress]);
 
       expect(slot).toBeDefined();
     });
 
-    it('should handle special characters in secrets', async () => {
+    it('should handle encrypted payloads with multiple recipients', async () => {
       jest.spyOn(fs, 'existsSync').mockReturnValue(false);
       jest.spyOn(fs.promises, 'writeFile').mockResolvedValue();
 
-      const specialSecret = 'my-secret!@#$%^&*()_+{}[]|\\:";\'<>?,./';
-      const slot = await service.store(specialSecret, [
+      const multiRecipientPayload = {
+        recipients: [
+          {
+            publicKey: Buffer.alloc(1568, 'a').toString('base64'),
+            ciphertext: Buffer.alloc(1600, 0).toString('base64'),
+          },
+          {
+            publicKey: Buffer.alloc(1568, 'b').toString('base64'),
+            ciphertext: Buffer.alloc(1600, 1).toString('base64'),
+          },
+        ],
+        encryptedData: Buffer.alloc(100, 'e').toString('base64'),
+        iv: Buffer.alloc(12, 'i').toString('base64'),
+        authTag: Buffer.alloc(16, 't').toString('base64'),
+      };
+
+      const slot = await service.store(multiRecipientPayload, [
+        '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
+      ]);
+
+      expect(slot).toBeDefined();
+    });
+
+    it('should store encrypted payload correctly', async () => {
+      jest.spyOn(fs, 'existsSync').mockReturnValue(false);
+      jest.spyOn(fs.promises, 'writeFile').mockResolvedValue();
+
+      const encryptedPayload = createMockEncryptedPayload();
+      const slot = await service.store(encryptedPayload, [
         '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
       ]);
 
       expect(slot).toBeDefined();
 
-      // Verify the secret was stored correctly
+      // Verify the encrypted payload was stored correctly
       const writeCall = (fs.promises.writeFile as jest.Mock).mock
         .calls[0] as unknown[];
       const writtenData = JSON.parse(writeCall[1] as string) as Record<
         string,
-        { secret: string; publicAddresses: string[] }
+        { encryptedPayload: any; publicAddresses: string[] }
       >;
-      expect(writtenData[slot].secret).toBe(specialSecret);
-    });
-
-    it('should handle very long secrets', async () => {
-      jest.spyOn(fs, 'existsSync').mockReturnValue(false);
-      jest.spyOn(fs.promises, 'writeFile').mockResolvedValue();
-
-      const longSecret = 'a'.repeat(10000);
-      const slot = await service.store(longSecret, [
-        '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
-      ]);
-
-      expect(slot).toBeDefined();
+      expect(writtenData[slot].encryptedPayload).toEqual(encryptedPayload);
     });
   });
 

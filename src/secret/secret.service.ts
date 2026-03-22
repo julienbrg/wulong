@@ -10,11 +10,14 @@ import * as path from 'path';
 import { randomBytes } from 'crypto';
 import { TeePlatformService } from '../attestation/tee-platform.service';
 import { AttestationResponseDto } from './dto/attestation-response.dto';
-import { MlKemEncryptionService } from '../encryption/mlkem-encryption.service';
+import {
+  MlKemEncryptionService,
+  MultiRecipientEncryptedPayload,
+} from '../encryption/mlkem-encryption.service';
 
 interface SecretEntry {
-  secret: string;
-  publicAddresses: string[];
+  encryptedPayload: MultiRecipientEncryptedPayload; // Multi-recipient encrypted data
+  publicAddresses: string[]; // Authorized SIWE addresses
 }
 
 interface SecretData {
@@ -36,25 +39,51 @@ export class SecretService {
   }
 
   /**
-   * Stores a secret and returns a unique slot identifier.
-   * @param secret The secret to store
-   * @param publicAddresses Array of Ethereum addresses that can access this secret
+   * Stores a multi-recipient encrypted secret and returns a unique slot identifier.
+   * @param encryptedPayload Multi-recipient ML-KEM encrypted payload (from w3pk)
+   * @param publicAddresses Array of Ethereum addresses that can access this secret (via SIWE)
    * @returns The slot identifier
-   * @throws BadRequestException if addresses are invalid
+   * @throws BadRequestException if payload or addresses are invalid
    */
-  async store(secret: string, publicAddresses: string[]): Promise<string> {
-    // Validate input
-    if (!secret || secret.trim().length === 0) {
-      throw new BadRequestException('Secret cannot be empty');
+  async store(
+    encryptedPayload: MultiRecipientEncryptedPayload,
+    publicAddresses: string[],
+  ): Promise<string> {
+    // Validate encryption service is available
+    if (!this.mlkemEncryptionService.isAvailable()) {
+      throw new BadRequestException(
+        'ML-KEM encryption not configured on server. Contact administrator.',
+      );
     }
 
+    // Validate payload structure
+    if (
+      !encryptedPayload ||
+      !encryptedPayload.recipients ||
+      encryptedPayload.recipients.length === 0
+    ) {
+      throw new BadRequestException(
+        'Invalid encrypted payload: must have at least one recipient',
+      );
+    }
+
+    // Validate at least one recipient ciphertext size
+    for (const recipient of encryptedPayload.recipients) {
+      const ciphertextBytes = Buffer.from(recipient.ciphertext, 'base64');
+      if (ciphertextBytes.length !== 1568 + 32) {
+        throw new BadRequestException(
+          `Invalid ML-KEM ciphertext size: ${ciphertextBytes.length} (expected ${1568 + 32})`,
+        );
+      }
+    }
+
+    // Validate addresses
     if (!publicAddresses || publicAddresses.length === 0) {
       throw new BadRequestException(
         'At least one public address must be provided',
       );
     }
 
-    // Validate all addresses
     for (const address of publicAddresses) {
       if (!isAddress(address)) {
         throw new BadRequestException(
@@ -63,7 +92,7 @@ export class SecretService {
       }
     }
 
-    // Normalize addresses to checksummed format
+    // Normalize addresses
     const normalizedAddresses = publicAddresses.map((addr) =>
       addr.toLowerCase(),
     );
@@ -74,9 +103,9 @@ export class SecretService {
     // Load existing secret data
     const secretData = await this.loadSecret();
 
-    // Store the entry
+    // Store the entry (encrypted at rest - quantum-safe!)
     secretData[slot] = {
-      secret,
+      encryptedPayload,
       publicAddresses: normalizedAddresses,
     };
 
@@ -88,11 +117,14 @@ export class SecretService {
 
   /**
    * Accesses a secret if the caller is an owner.
+   * Server performs ML-KEM decryption and returns plaintext.
+   *
    * @param slot The slot identifier
    * @param callerAddress The address of the caller (from SIWE authentication)
-   * @returns The secret
+   * @returns The decrypted secret (plaintext)
    * @throws NotFoundException if slot doesn't exist
    * @throws ForbiddenException if caller is not an owner
+   * @throws BadRequestException if decryption fails
    */
   async access(slot: string, callerAddress: string): Promise<string> {
     if (!slot || slot.trim().length === 0) {
@@ -101,6 +133,12 @@ export class SecretService {
 
     if (!callerAddress || !isAddress(callerAddress)) {
       throw new BadRequestException('Invalid caller address');
+    }
+
+    if (!this.mlkemEncryptionService.isAvailable()) {
+      throw new BadRequestException(
+        'ML-KEM encryption not configured on server',
+      );
     }
 
     // Load secret data
@@ -115,14 +153,24 @@ export class SecretService {
     // Normalize caller address for comparison
     const normalizedCaller = callerAddress.toLowerCase();
 
-    // Check if caller is an owner
+    // Check if caller is an owner (SIWE authorization)
     if (!entry.publicAddresses.includes(normalizedCaller)) {
       throw new ForbiddenException(
         'Access denied: caller is not an owner of this secret',
       );
     }
 
-    return entry.secret;
+    // Decrypt the secret using server's ML-KEM private key
+    try {
+      const plaintextSecret = this.mlkemEncryptionService.decryptMultiRecipient(
+        entry.encryptedPayload,
+      );
+      return plaintextSecret;
+    } catch (error) {
+      throw new BadRequestException(
+        `Failed to decrypt secret: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
   }
 
   /**

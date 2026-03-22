@@ -12,16 +12,26 @@ https://localhost:3000
 
 ## Table of Contents
 
-- [Chest Endpoints](#chest-endpoints)
-  - [GET /chest/attestation](#get-chestattestation)
-  - [POST /chest/store](#post-cheststore)
-  - [GET /chest/access/:slot](#get-chestaccessslot)
-- [Authentication Endpoints](#authentication-endpoints)
-  - [POST /auth/nonce](#post-authnonce)
-- [Health Check Endpoints](#health-check-endpoints)
-  - [GET /health](#get-health)
-  - [GET /health/ready](#get-healthready)
-  - [GET /health/live](#get-healthlive)
+- [Wulong API Reference](#wulong-api-reference)
+  - [Base URL](#base-url)
+  - [Table of Contents](#table-of-contents)
+  - [Chest Endpoints](#chest-endpoints)
+    - [GET /chest/attestation](#get-chestattestation)
+    - [POST /chest/store](#post-cheststore)
+    - [GET /chest/access/:slot](#get-chestaccessslot)
+  - [Authentication Endpoints](#authentication-endpoints)
+    - [POST /auth/nonce](#post-authnonce)
+  - [Health Check Endpoints](#health-check-endpoints)
+    - [GET /health](#get-health)
+    - [GET /health/ready](#get-healthready)
+    - [GET /health/live](#get-healthlive)
+  - [Error Responses](#error-responses)
+  - [Rate Limiting](#rate-limiting)
+  - [Swagger/OpenAPI Documentation](#swaggeropenapi-documentation)
+  - [Client Libraries](#client-libraries)
+  - [Security Best Practices](#security-best-practices)
+  - [Support](#support)
+  - [Related Documentation](#related-documentation)
 
 ---
 
@@ -105,7 +115,7 @@ Store a secret with owner-based access control.
 curl -k -X POST https://localhost:3000/chest/store \
   -H "Content-Type: application/json" \
   -d '{
-    "secret": "my-super-secret",
+    "secret": "苟全性命於亂世，不求聞達於諸侯。",
     "publicAddresses": ["0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"]
   }'
 
@@ -195,7 +205,7 @@ curl -k https://localhost:3000/chest/access/a1b2c3d4... \
 
 # Response
 {
-  "secret": "my-super-secret"
+  "secret": "苟全性命於亂世，不求聞達於諸侯。"
 }
 ```
 

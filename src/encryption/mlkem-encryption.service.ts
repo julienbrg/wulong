@@ -6,16 +6,37 @@ import * as crypto from 'crypto';
 /**
  * ML-KEM (Kyber) quantum-resistant encryption service
  *
- * This service provides post-quantum encryption/decryption using ML-KEM-1024 (NIST FIPS 203).
+ * This service provides ML-KEM encryption/decryption using ML-KEM-1024 (NIST FIPS 203).
  *
- * Architecture:
- * 1. Client encapsulates with admin's public key → generates shared secret
- * 2. Client encrypts data with AES-256-GCM using shared secret
- * 3. Client sends { ciphertext, encryptedData, iv, authTag }
- * 4. Server decapsulates ciphertext with private key → recovers shared secret
- * 5. Server decrypts data with AES-256-GCM
+ * Architecture (Multi-Recipient):
+ * 1. Client generates random AES-256 key
+ * 2. Client encrypts data with AES-256-GCM
+ * 3. For each recipient (client + server):
+ *    - Encapsulate shared secret with recipient's ML-KEM public key
+ *    - XOR-encrypt the AES key with the shared secret
+ *    - Store { publicKey, ciphertext (KEM + encrypted AES key) }
+ * 4. Client sends { recipients[], encryptedData, iv, authTag }
+ * 5. Server finds its recipient entry (by public key)
+ * 6. Server decapsulates to recover shared secret
+ * 7. Server XOR-decrypts to recover AES key
+ * 8. Server decrypts data with AES-256-GCM
+ *
+ * Compatible with w3pk's mlkemEncrypt/mlkemDecrypt functions.
  */
 
+export interface RecipientEntry {
+  publicKey: string; // Base64 ML-KEM-1024 public key (1568 bytes)
+  ciphertext: string; // Base64 combined: ML-KEM ciphertext (1568) + encrypted AES key (32) = 1600 bytes
+}
+
+export interface MultiRecipientEncryptedPayload {
+  recipients: RecipientEntry[]; // Array of recipients
+  encryptedData: string; // Base64 AES-256-GCM encrypted data (shared)
+  iv: string; // Base64 IV (12 bytes)
+  authTag: string; // Base64 auth tag (16 bytes)
+}
+
+// Legacy single-recipient format (kept for backward compatibility)
 export interface EncryptedPayload {
   ciphertext: string; // ML-KEM ciphertext (base64)
   encryptedData: string; // AES-256-GCM encrypted data (base64)
@@ -102,10 +123,91 @@ export class MlKemEncryptionService {
   }
 
   /**
-   * Decrypt an encrypted payload
+   * Decrypt a multi-recipient encrypted payload
+   *
+   * @param payload - Multi-recipient encrypted payload from client (w3pk format)
+   * @returns Decrypted plaintext
+   */
+  decryptMultiRecipient(payload: MultiRecipientEncryptedPayload): string {
+    if (!this.mlkem || !this.privateKey || !this.publicKey) {
+      throw new Error('ML-KEM encryption not initialized');
+    }
+
+    try {
+      // Find the recipient entry for this server's public key
+      const serverPublicKeyBase64 = Buffer.from(this.publicKey).toString(
+        'base64',
+      );
+      const recipientEntry = payload.recipients.find(
+        (r) => r.publicKey === serverPublicKeyBase64,
+      );
+
+      if (!recipientEntry) {
+        throw new Error(
+          `Server public key not found in recipients list (expected: ${serverPublicKeyBase64.substring(0, 32)}...)`,
+        );
+      }
+
+      // Decode combined ciphertext (ML-KEM ciphertext + encrypted AES key)
+      const combinedCiphertext = Buffer.from(
+        recipientEntry.ciphertext,
+        'base64',
+      );
+
+      // Split: ML-KEM ciphertext (1568 bytes) + encrypted AES key (32 bytes)
+      const kemCiphertextLength = 1568;
+      if (combinedCiphertext.length !== kemCiphertextLength + 32) {
+        throw new Error(
+          `Invalid combined ciphertext size: ${combinedCiphertext.length} (expected ${kemCiphertextLength + 32})`,
+        );
+      }
+
+      const kemCiphertext = combinedCiphertext.subarray(0, kemCiphertextLength);
+      const encryptedAesKey = combinedCiphertext.subarray(kemCiphertextLength);
+
+      // Decapsulate to recover shared secret
+      const sharedSecret = this.mlkem.decap(kemCiphertext, this.privateKey);
+
+      // XOR-decrypt the AES key using the first 32 bytes of shared secret
+      const kek = sharedSecret.subarray(0, 32);
+      const aesKey = Buffer.alloc(32);
+      for (let i = 0; i < 32; i++) {
+        aesKey[i] = encryptedAesKey[i] ^ kek[i];
+      }
+
+      // Decode encrypted data components
+      const encryptedData = Buffer.from(payload.encryptedData, 'base64');
+      const iv = Buffer.from(payload.iv, 'base64');
+      const authTag = Buffer.from(payload.authTag, 'base64');
+
+      // Decrypt data with AES-256-GCM
+      const decipher = crypto.createDecipheriv('aes-256-gcm', aesKey, iv);
+      decipher.setAuthTag(authTag);
+
+      let decrypted = decipher.update(encryptedData);
+      decrypted = Buffer.concat([decrypted, decipher.final()]);
+
+      return decrypted.toString('utf-8');
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'test') {
+        this.logger.error('Multi-recipient decryption failed:', error);
+      }
+      // In test mode, preserve original error message for better debugging
+      if (process.env.NODE_ENV === 'test') {
+        throw error;
+      }
+      throw new Error('Failed to decrypt multi-recipient data', {
+        cause: error,
+      });
+    }
+  }
+
+  /**
+   * Decrypt an encrypted payload (legacy single-recipient format)
    *
    * @param payload - Encrypted payload from client
    * @returns Decrypted plaintext
+   * @deprecated Use decryptMultiRecipient for new implementations
    */
   decrypt(payload: EncryptedPayload): string {
     if (!this.mlkem || !this.privateKey) {
@@ -140,6 +242,10 @@ export class MlKemEncryptionService {
     } catch (error) {
       if (process.env.NODE_ENV !== 'test') {
         this.logger.error('Decryption failed:', error);
+      }
+      // In test mode, preserve original error message for better debugging
+      if (process.env.NODE_ENV === 'test') {
+        throw error;
       }
       throw new Error('Failed to decrypt data', { cause: error });
     }

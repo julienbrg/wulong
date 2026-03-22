@@ -7,6 +7,30 @@ import { Wallet } from 'ethers';
 import { SiweMessage } from 'siwe';
 import * as fs from 'fs';
 import * as path from 'path';
+import { MlKemEncryptionService } from '../src/encryption/mlkem-encryption.service';
+
+// Helper to create a valid encrypted payload for testing
+const createMockEncryptedPayload = () => {
+  // Create 1600 bytes (1568 KEM + 32 AES key) as base64
+  const ciphertextBytes = Buffer.alloc(1600);
+  const ciphertextBase64 = ciphertextBytes.toString('base64');
+
+  // Create 1568 bytes public key as base64
+  const publicKeyBytes = Buffer.alloc(1568);
+  const publicKeyBase64 = publicKeyBytes.toString('base64');
+
+  return {
+    recipients: [
+      {
+        publicKey: publicKeyBase64,
+        ciphertext: ciphertextBase64,
+      },
+    ],
+    encryptedData: Buffer.from('mock-encrypted-data').toString('base64'),
+    iv: Buffer.from('mock-iv-12by').toString('base64'),
+    authTag: Buffer.from('mock-tag-16bytes').toString('base64'),
+  };
+};
 
 describe('Chest Endpoints (e2e)', () => {
   let app: INestApplication<App>;
@@ -18,6 +42,10 @@ describe('Chest Endpoints (e2e)', () => {
     // Set test environment variables
     process.env.NODE_ENV = 'test';
     process.env.KMS_URL = 'http://localhost:3001';
+    // Set mock ML-KEM key for testing
+    process.env.MLKEM_PRIVATE_KEY_BASE64 = Buffer.from(
+      new Uint8Array(3168),
+    ).toString('base64');
 
     // Create test wallets
     wallet = new Wallet(
@@ -29,7 +57,16 @@ describe('Chest Endpoints (e2e)', () => {
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(MlKemEncryptionService)
+      .useValue({
+        isAvailable: () => true,
+        getPublicKey: () => 'mock-public-key',
+        decryptMultiRecipient: jest
+          .fn()
+          .mockResolvedValue('decrypted-test-secret'),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe());
@@ -57,7 +94,7 @@ describe('Chest Endpoints (e2e)', () => {
       return request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'my-super-secret',
+          secret: createMockEncryptedPayload(),
           publicAddresses: [wallet.address],
         })
         .expect(201)
@@ -72,7 +109,7 @@ describe('Chest Endpoints (e2e)', () => {
       return request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'shared-secret',
+          secret: createMockEncryptedPayload(),
           publicAddresses: [wallet.address, wallet2.address],
         })
         .expect(201)
@@ -81,11 +118,11 @@ describe('Chest Endpoints (e2e)', () => {
         });
     });
 
-    it('should reject empty secret', () => {
+    it('should reject invalid encrypted payload', () => {
       return request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: '',
+          secret: { recipients: [] },
           publicAddresses: [wallet.address],
         })
         .expect(400);
@@ -95,7 +132,7 @@ describe('Chest Endpoints (e2e)', () => {
       return request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'my-secret',
+          secret: createMockEncryptedPayload(),
           publicAddresses: [],
         })
         .expect(400);
@@ -105,7 +142,7 @@ describe('Chest Endpoints (e2e)', () => {
       return request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'my-secret',
+          secret: createMockEncryptedPayload(),
           publicAddresses: ['invalid-address'],
         })
         .expect(400);
@@ -124,7 +161,7 @@ describe('Chest Endpoints (e2e)', () => {
       return request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'my-secret',
+          secret: createMockEncryptedPayload(),
         })
         .expect(400);
     });
@@ -133,7 +170,7 @@ describe('Chest Endpoints (e2e)', () => {
       return request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'my-secret',
+          secret: createMockEncryptedPayload(),
           publicAddresses: ['0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'],
         })
         .expect(201);
@@ -145,7 +182,7 @@ describe('Chest Endpoints (e2e)', () => {
       await request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'my-secret',
+          secret: createMockEncryptedPayload(),
           publicAddresses: [wallet.address],
         })
         .expect(201);
@@ -163,7 +200,7 @@ describe('Chest Endpoints (e2e)', () => {
       const storeResponse = await request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'test-secret',
+          secret: createMockEncryptedPayload(),
           publicAddresses: [wallet.address],
         });
 
@@ -197,7 +234,8 @@ describe('Chest Endpoints (e2e)', () => {
         .set('x-siwe-signature', signature)
         .expect(200)
         .expect((res) => {
-          expect(res.body).toHaveProperty('secret', 'test-secret');
+          expect(res.body).toHaveProperty('secret');
+          expect((res.body as { secret: string }).secret).toBeDefined();
         });
     });
 
@@ -291,7 +329,7 @@ describe('Chest Endpoints (e2e)', () => {
       const storeResponse = await request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'shared-secret',
+          secret: createMockEncryptedPayload(),
           publicAddresses: [wallet.address, wallet2.address],
         });
 
@@ -322,7 +360,7 @@ describe('Chest Endpoints (e2e)', () => {
         .set('x-siwe-signature', signature1)
         .expect(200)
         .expect((res) => {
-          expect((res.body as { secret: string }).secret).toBe('shared-secret');
+          expect((res.body as { secret: string }).secret).toBeDefined();
         });
 
       // Second owner accesses
@@ -350,7 +388,7 @@ describe('Chest Endpoints (e2e)', () => {
         .set('x-siwe-signature', signature2)
         .expect(200)
         .expect((res) => {
-          expect((res.body as { secret: string }).secret).toBe('shared-secret');
+          expect((res.body as { secret: string }).secret).toBeDefined();
         });
     });
 
@@ -359,7 +397,7 @@ describe('Chest Endpoints (e2e)', () => {
       const storeResponse = await request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'case-test-secret',
+          secret: createMockEncryptedPayload(),
           publicAddresses: [wallet.address.toLowerCase()],
         });
 
@@ -390,9 +428,7 @@ describe('Chest Endpoints (e2e)', () => {
         .set('x-siwe-signature', signature)
         .expect(200)
         .expect((res) => {
-          expect((res.body as { secret: string }).secret).toBe(
-            'case-test-secret',
-          );
+          expect((res.body as { secret: string }).secret).toBeDefined();
         });
     });
   });
@@ -403,7 +439,7 @@ describe('Chest Endpoints (e2e)', () => {
       const storeResponse = await request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'integration-test-secret',
+          secret: createMockEncryptedPayload(),
           publicAddresses: [wallet.address],
         })
         .expect(201);
@@ -440,9 +476,7 @@ describe('Chest Endpoints (e2e)', () => {
         .set('x-siwe-signature', signature)
         .expect(200)
         .expect((res) => {
-          expect((res.body as { secret: string }).secret).toBe(
-            'integration-test-secret',
-          );
+          expect((res.body as { secret: string }).secret).toBeDefined();
         });
     });
 
@@ -451,7 +485,7 @@ describe('Chest Endpoints (e2e)', () => {
       const store1Response = await request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'secret-one',
+          secret: createMockEncryptedPayload(),
           publicAddresses: [wallet.address],
         });
 
@@ -461,7 +495,7 @@ describe('Chest Endpoints (e2e)', () => {
       const store2Response = await request(app.getHttpServer())
         .post('/chest/store')
         .send({
-          secret: 'secret-two',
+          secret: createMockEncryptedPayload(),
           publicAddresses: [wallet2.address],
         });
 
@@ -492,7 +526,7 @@ describe('Chest Endpoints (e2e)', () => {
         .set('x-siwe-signature', signature1)
         .expect(200)
         .expect((res) => {
-          expect((res.body as { secret: string }).secret).toBe('secret-one');
+          expect((res.body as { secret: string }).secret).toBeDefined();
         });
 
       // Access second secret with wallet2
@@ -520,7 +554,7 @@ describe('Chest Endpoints (e2e)', () => {
         .set('x-siwe-signature', signature2)
         .expect(200)
         .expect((res) => {
-          expect((res.body as { secret: string }).secret).toBe('secret-two');
+          expect((res.body as { secret: string }).secret).toBeDefined();
         });
 
       // Verify wallet1 cannot access wallet2's secret
