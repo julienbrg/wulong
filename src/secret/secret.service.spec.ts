@@ -239,6 +239,31 @@ describe('SecretService', () => {
         ]),
       ).rejects.toThrow('Failed to save secret');
     });
+
+    it('should throw BadRequestException when ML-KEM encryption is not available', async () => {
+      mockMlKemEncryptionService.isAvailable.mockReturnValue(false);
+      const encryptedPayload = createMockEncryptedPayload();
+
+      await expect(
+        service.store(encryptedPayload, [
+          '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
+        ]),
+      ).rejects.toThrow(
+        'ML-KEM encryption not configured on server. Contact administrator.',
+      );
+    });
+
+    it('should throw BadRequestException for invalid ciphertext size', async () => {
+      const invalidPayload = createMockEncryptedPayload();
+      invalidPayload.recipients[0].ciphertext =
+        Buffer.alloc(100).toString('base64'); // Invalid size
+
+      await expect(
+        service.store(invalidPayload, [
+          '0xbfbaa5a59e3b6c06aff9c975092b8705f804fa1c',
+        ]),
+      ).rejects.toThrow(/Invalid ML-KEM ciphertext size/);
+    });
   });
 
   describe('access', () => {
@@ -358,6 +383,36 @@ describe('SecretService', () => {
 
     it('should return empty object if chest.json does not exist', async () => {
       jest.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+      await expect(service.access(testSlot, testAddress)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should throw BadRequestException when ML-KEM encryption is not available during access', async () => {
+      mockMlKemEncryptionService.isAvailable.mockReturnValue(false);
+
+      await expect(service.access(testSlot, testAddress)).rejects.toThrow(
+        'ML-KEM encryption not configured on server',
+      );
+    });
+
+    it('should throw BadRequestException if decryption fails', async () => {
+      mockMlKemEncryptionService.decryptMultiRecipient.mockImplementation(
+        () => {
+          throw new Error('Decryption failed');
+        },
+      );
+
+      await expect(service.access(testSlot, testAddress)).rejects.toThrow(
+        /Failed to decrypt secret/,
+      );
+    });
+
+    it('should handle ENOENT error when loading secret', async () => {
+      const enoentError = new Error('File not found') as NodeJS.ErrnoException;
+      enoentError.code = 'ENOENT';
+      jest.spyOn(fs.promises, 'readFile').mockRejectedValue(enoentError);
 
       await expect(service.access(testSlot, testAddress)).rejects.toThrow(
         NotFoundException,

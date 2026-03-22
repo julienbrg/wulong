@@ -74,6 +74,7 @@ export class StoreRequestDto {
       'Multi-recipient ML-KEM encrypted payload (from w3pk.mlkemEncrypt)',
     type: MultiRecipientEncryptedPayload,
   })
+  @IsNotEmpty()
   @ValidateNested()
   @Type(() => MultiRecipientEncryptedPayload)
   secret: MultiRecipientEncryptedPayload;

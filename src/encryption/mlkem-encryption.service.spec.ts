@@ -74,6 +74,68 @@ describe('MlKemEncryptionService', () => {
       expect(testService.isAvailable()).toBe(false);
       expect(testService.getPublicKey()).toBeNull();
     });
+
+    it('should throw error for invalid public key size', async () => {
+      const invalidPublicKey = Buffer.alloc(100); // Wrong size
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          MlKemEncryptionService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: jest.fn((key: string) => {
+                if (key === 'ADMIN_MLKEM_PUBLIC_KEY') {
+                  return invalidPublicKey.toString('base64');
+                }
+                if (key === 'ADMIN_MLKEM_PRIVATE_KEY') {
+                  return Buffer.from(serverPrivateKey).toString('base64');
+                }
+                return null;
+              }),
+            },
+          },
+        ],
+      }).compile();
+
+      const testService = module.get<MlKemEncryptionService>(
+        MlKemEncryptionService,
+      );
+
+      await expect(testService.onModuleInit()).rejects.toThrow(
+        /Invalid ML-KEM-1024 public key size/,
+      );
+    });
+
+    it('should throw error for invalid private key size', async () => {
+      const invalidPrivateKey = Buffer.alloc(100); // Wrong size
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          MlKemEncryptionService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: jest.fn((key: string) => {
+                if (key === 'ADMIN_MLKEM_PUBLIC_KEY') {
+                  return Buffer.from(serverPublicKey).toString('base64');
+                }
+                if (key === 'ADMIN_MLKEM_PRIVATE_KEY') {
+                  return invalidPrivateKey.toString('base64');
+                }
+                return null;
+              }),
+            },
+          },
+        ],
+      }).compile();
+
+      const testService = module.get<MlKemEncryptionService>(
+        MlKemEncryptionService,
+      );
+
+      await expect(testService.onModuleInit()).rejects.toThrow(
+        /Invalid ML-KEM-1024 private key size/,
+      );
+    });
   });
 
   describe('getPublicKey', () => {
@@ -238,6 +300,91 @@ describe('MlKemEncryptionService', () => {
       encrypted.authTag = Buffer.from('corrupted_tag').toString('base64');
 
       expect(() => service.decrypt(encrypted)).toThrow();
+    });
+
+    it('should throw error when decrypt called without initialization', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          MlKemEncryptionService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: jest.fn(() => null),
+            },
+          },
+        ],
+      }).compile();
+
+      const uninitializedService = module.get<MlKemEncryptionService>(
+        MlKemEncryptionService,
+      );
+      await uninitializedService.onModuleInit();
+
+      const dummyPayload = {
+        ciphertext: 'dummy',
+        encryptedData: 'dummy',
+        iv: 'dummy',
+        authTag: 'dummy',
+      };
+
+      expect(() => uninitializedService.decrypt(dummyPayload)).toThrow(
+        'ML-KEM encryption not initialized',
+      );
+    });
+
+    it('should throw error when encrypt called without initialization', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          MlKemEncryptionService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: jest.fn(() => null),
+            },
+          },
+        ],
+      }).compile();
+
+      const uninitializedService = module.get<MlKemEncryptionService>(
+        MlKemEncryptionService,
+      );
+      await uninitializedService.onModuleInit();
+
+      expect(() => uninitializedService.encrypt('test')).toThrow(
+        'ML-KEM encryption not initialized',
+      );
+    });
+  });
+
+  describe('Error handling for uninitialized service', () => {
+    it('should throw error when decryptMultiRecipient called without initialization', async () => {
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          MlKemEncryptionService,
+          {
+            provide: ConfigService,
+            useValue: {
+              get: jest.fn(() => null),
+            },
+          },
+        ],
+      }).compile();
+
+      const uninitializedService = module.get<MlKemEncryptionService>(
+        MlKemEncryptionService,
+      );
+      await uninitializedService.onModuleInit();
+
+      const dummyPayload = {
+        recipients: [],
+        encryptedData: 'dummy',
+        iv: 'dummy',
+        authTag: 'dummy',
+      };
+
+      expect(() =>
+        uninitializedService.decryptMultiRecipient(dummyPayload),
+      ).toThrow('ML-KEM encryption not initialized');
     });
   });
 });
