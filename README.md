@@ -47,6 +47,10 @@ pnpm ts-node scripts/generate-admin-keypair.ts
 
 # Start development server
 pnpm start:dev
+
+# Test ML-KEM encryption (in another terminal)
+pnpm test:mlkem              # Basic encryption test
+pnpm test:store-access       # Full store+access flow with SIWE
 ```
 
 Access at `https://localhost:3000` (accept self-signed certificate warning)
@@ -67,6 +71,9 @@ docker buildx build --platform linux/amd64 -t YOUR_USERNAME/wulong:latest --push
 
 # Deploy to Phala Cloud
 phala deploy --interactive
+
+# Test against Phala deployment
+WULONG_URL=https://your-app-id-3000.phala.network pnpm test:store-access
 ```
 
 ## Modes

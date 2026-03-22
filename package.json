@@ -17,6 +17,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:mlkem": "ts-node scripts/test-mlkem-flow.ts",
+    "test:store-access": "ts-node scripts/test-store-and-access.ts",
     "verify:attestation": "ts-node scripts/verify-attestation.ts",
     "dance": "pnpm format && pnpm lint && pnpm test && pnpm test:e2e && pnpm build && pnpm outdated || true"
   },

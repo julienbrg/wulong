@@ -401,29 +401,598 @@ export function decryptSecret(encryptedPayload) {
 
 ## Testing
 
-### Local Testing
+This section explains how to test the ML-KEM multi-recipient encryption implementation both locally and on Phala Network.
+
+### Local Testing (Development)
+
+#### Step 1: Generate Server ML-KEM Keypair
+
+Generate quantum-resistant keys for the wulong server:
 
 ```bash
-# 1. Generate ML-KEM keypair
+cd /Users/ju/wulong
 pnpm ts-node scripts/generate-admin-keypair.ts
+```
 
-# 2. Add to .env
-ADMIN_MLKEM_PUBLIC_KEY=...
-ADMIN_MLKEM_PRIVATE_KEY=...
+This will output:
 
-# 3. Test standalone flow
-pnpm ts-node scripts/test-mlkem-flow.ts
+```
+✅ Keypair generated successfully!
 
-# 4. Test with server
+📋 Add these to your .env file:
+
+ADMIN_MLKEM_PUBLIC_KEY=ZLVMNpXCmEp7vhcylKzGXcx8wVEcaQKI...
+ADMIN_MLKEM_PRIVATE_KEY=82eI7sQLvGEut7Z4RvaF+Ju60Esj/AW/...
+```
+
+**IMPORTANT:** Keep the private key secret! In production TEE, this will be sealed in hardware.
+
+#### Step 2: Configure Environment
+
+Create or update `.env`:
+
+```bash
+# ML-KEM-1024 Admin Keypair (quantum-resistant encryption)
+ADMIN_MLKEM_PUBLIC_KEY=<paste_public_key_here>
+ADMIN_MLKEM_PRIVATE_KEY=<paste_private_key_here>
+```
+
+#### Step 3: Start Wulong Server
+
+```bash
 pnpm start:dev
-pnpm ts-node scripts/test-mlkem-with-server.ts
+```
 
-# 5. Run unit tests
+The server should log:
+
+```
+✅ ML-KEM-1024 keys loaded successfully
+Public key: ZLVMNpXCmEp7vhcylKzGXcx8wVEcaQKI... (1568 bytes)
+```
+
+Server will be available at `http://localhost:3000`
+
+#### Step 4: Test ML-KEM Flow (Standalone)
+
+Use the included test script to verify the basic flow:
+
+```bash
+pnpm ts-node scripts/test-mlkem-flow.ts
+```
+
+Expected output:
+
+```
+🧪 Testing ML-KEM encryption flow
+
+1️⃣  Generating TEE keypair...
+  ✅ Public key: ZLVMNpXCmEp7... (1568 bytes)
+
+2️⃣  Client: Getting TEE attestation...
+  ✅ Received TEE public key
+
+3️⃣  Client: Encrypting secret for TEE...
+  📦 Encapsulating with TEE public key...
+  🔐 Encrypting with AES-256-GCM...
+  ✅ Encrypted payload ready
+
+4️⃣  Client: Storing encrypted secret...
+  ✅ Assigned slot: 05919c62d6a408cb...
+
+5️⃣  Server: Decrypting secret...
+  🔓 Decrypting with AES-256-GCM...
+  ✅ Decrypted: "This is my quantum-safe secret! 🔐"
+
+6️⃣  Verification:
+  ✅ SUCCESS! Plaintext matches decrypted text
+  ✅ ML-KEM encryption/decryption working correctly
+
+🎉 All tests passed!
+```
+
+#### Step 5: Test Complete Store+Access Flow
+
+Test the full flow including SIWE authentication and server-side decryption:
+
+```bash
+pnpm ts-node scripts/test-store-and-access.ts
+```
+
+Expected output:
+
+```
+🧪 Testing ML-KEM store and access flow with SIWE authentication
+
+🔗 Server: http://localhost:3000
+👤 Test Wallet: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+
+1️⃣  Getting server attestation...
+  ✅ Platform: none
+  ✅ ML-KEM Public Key: k3VARNFcS4hWl6AfR0DMylysiyuCqgwO...
+  ⚠️  Measurement: MOCK_MEASUREMENT...
+
+2️⃣  Generating client ML-KEM keypair...
+  ✅ Generated (1568 bytes)
+
+3️⃣  Encrypting secret for client + server...
+  📝 Plaintext: "🔐 My quantum-safe secret data! Testing store+access flow."
+  ✅ Encrypted with 2 recipients
+
+4️⃣  Storing encrypted secret on server...
+  ✅ Stored in slot: c62d08e957b68109...
+
+5️⃣  Getting nonce for SIWE authentication...
+  ✅ Nonce: 4fhgr4TAfosNzZI3S
+
+6️⃣  Creating and signing SIWE message...
+  ✅ SIWE message signed
+     Domain: localhost
+     Address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+     Signature: 0xf8db734904dfd0d0...
+
+7️⃣  Accessing secret (server-side decryption with SIWE)...
+  📝 Server decrypted: "🔐 My quantum-safe secret data! Testing store+access flow."
+  ✅ Match: true
+
+📊 Test Summary:
+  ✅ Server attestation retrieved
+  ✅ Multi-recipient encryption successful
+  ✅ Secret stored on server
+  ✅ SIWE authentication successful
+  ✅ Server-side decryption working
+  ✅ Plaintext matches (end-to-end verified)
+
+🎉 All tests passed! Complete store+access flow working correctly.
+
+📋 What was tested:
+  • ML-KEM-1024 quantum-resistant encryption
+  • Multi-recipient encryption (client + server)
+  • SIWE authentication with ethers wallet
+  • Server-side ML-KEM decryption in TEE
+  • End-to-end data integrity
+```
+
+This script tests:
+- ✅ **Multi-recipient encryption**: Client + server can both decrypt
+- ✅ **Store endpoint**: Secret stored with access control
+- ✅ **SIWE authentication**: Wallet-based authentication flow
+- ✅ **Server-side decryption**: ML-KEM decryption in TEE
+- ✅ **End-to-end verification**: Plaintext matches original
+
+#### Step 6: Test with w3pk Client (Optional)
+
+Create a test client using w3pk (in a separate directory or in w3pk repository):
+
+```typescript
+// test-wulong-mlkem.ts
+import { createWeb3Passkey, mlkemEncrypt } from 'w3pk';
+import { Wallet } from 'ethers';
+
+async function testWulongMLKEM() {
+  // 1. Get server's attestation (includes ML-KEM public key)
+  const attestation = await fetch('http://localhost:3000/chest/attestation')
+    .then(r => r.json());
+
+  console.log('📋 Server Attestation:');
+  console.log(`  Platform: ${attestation.platform}`);
+  console.log(`  ML-KEM Public Key: ${attestation.mlkemPublicKey.substring(0, 32)}...`);
+
+  // CRITICAL: In production, verify attestation here!
+  // For local testing, we'll skip verification
+
+  // 2. Create w3pk instance and login
+  const w3pk = createWeb3Passkey();
+  await w3pk.register({ username: 'test-user' });
+  await w3pk.login();
+
+  console.log(`\n👤 Client Address: ${await w3pk.getAddress('STANDARD')}`);
+
+  // 3. Encrypt secret for yourself + server
+  const plaintext = 'My super secret data! 🔐';
+  console.log(`\n📝 Plaintext: "${plaintext}"`);
+
+  const encrypted = await w3pk.mlkemEncrypt(
+    plaintext,
+    [attestation.mlkemPublicKey]  // Server as recipient
+  );
+
+  console.log(`\n🔐 Encrypted Payload:`);
+  console.log(`  Recipients: ${encrypted.recipients.length}`);
+  console.log(`  Encrypted Data: ${encrypted.encryptedData.substring(0, 32)}...`);
+
+  // 4. Store encrypted secret on server
+  const storeResponse = await fetch('http://localhost:3000/chest/store', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      secret: encrypted,
+      publicAddresses: [await w3pk.getAddress('STANDARD')]
+    })
+  });
+
+  const { slot } = await storeResponse.json();
+  console.log(`\n✅ Stored in slot: ${slot}`);
+
+  // 5a. Client-side decryption (privacy-first!)
+  console.log(`\n🔓 Client-side decryption (no server involved):`);
+  const clientDecrypted = await w3pk.mlkemDecrypt(encrypted);
+  console.log(`  Decrypted: "${clientDecrypted}"`);
+  console.log(`  ✅ Match: ${clientDecrypted === plaintext}`);
+
+  // 5b. Server-side decryption (requires SIWE auth)
+  console.log(`\n🔓 Server-side decryption (with SIWE auth):`);
+
+  // Generate SIWE message
+  const domain = 'localhost:3000';
+  const origin = 'http://localhost:3000';
+  const siweMessage = await w3pk.signInWithEthereum(domain, {
+    uri: origin,
+    statement: 'Access encrypted secret',
+  });
+
+  // Access secret via server
+  const accessResponse = await fetch(`http://localhost:3000/chest/access/${slot}`, {
+    headers: {
+      'x-siwe-message': Buffer.from(siweMessage.message).toString('base64'),
+      'x-siwe-signature': siweMessage.signature,
+    }
+  });
+
+  const { secret: serverDecrypted } = await accessResponse.json();
+  console.log(`  Decrypted: "${serverDecrypted}"`);
+  console.log(`  ✅ Match: ${serverDecrypted === plaintext}`);
+
+  console.log(`\n🎉 All tests passed! Multi-recipient ML-KEM working correctly.`);
+}
+
+testWulongMLKEM().catch(err => {
+  console.error('❌ Test failed:', err);
+  process.exit(1);
+});
+```
+
+Run the test:
+
+```bash
+pnpm ts-node test-wulong-mlkem.ts
+```
+
+#### Step 7: Test API with curl (Manual Testing)
+
+##### Get Attestation
+
+```bash
+curl http://localhost:3000/chest/attestation | jq
+```
+
+Expected response:
+
+```json
+{
+  "platform": "none",
+  "report": "...",
+  "measurement": "...",
+  "timestamp": "2026-03-22T...",
+  "mlkemPublicKey": "ZLVMNpXCmEp7vhcylKzGXcx8wVEcaQKI..."
+}
+```
+
+##### Store Encrypted Secret
+
+You'll need to encrypt client-side first using w3pk, then:
+
+```bash
+curl -X POST http://localhost:3000/chest/store \
+  -H "Content-Type: application/json" \
+  -d '{
+    "secret": {
+      "recipients": [
+        {
+          "publicKey": "client_public_key_base64...",
+          "ciphertext": "client_ciphertext_base64..."
+        },
+        {
+          "publicKey": "server_public_key_base64...",
+          "ciphertext": "server_ciphertext_base64..."
+        }
+      ],
+      "encryptedData": "encrypted_data_base64...",
+      "iv": "iv_base64...",
+      "authTag": "auth_tag_base64..."
+    },
+    "publicAddresses": ["0xYourEthereumAddress..."]
+  }'
+```
+
+#### Step 8: Run Unit and E2E Tests
+
+```bash
+# Run unit tests
 pnpm test
 
-# 6. Run e2e tests
+# Run e2e tests
 pnpm test:e2e
 ```
+
+### Phala Network Testing (Production TEE)
+
+#### Prerequisites
+
+1. **Phala Account**: Register at [Phala Cloud](https://cloud.phala.network)
+2. **Phala CLI**: Install with `npm install -g @phala/cli`
+3. **Docker Hub**: For hosting container images
+4. **ML-KEM Keys**: Generated and added to `.env.prod`
+
+#### Step 1: Build and Deploy to Phala
+
+Follow the complete deployment process:
+
+```bash
+# 1. Build the application
+pnpm build
+
+# 2. Build and push Docker image for AMD64
+docker buildx build --platform linux/amd64 -t YOUR_USERNAME/wulong:latest --no-cache --push .
+
+# 3. Deploy to Phala Cloud
+phala deploy --interactive
+# Select docker-compose.yml and .env.prod when prompted
+# Choose tdx.small instance type for TEE support
+```
+
+See [PHALA_CONFIG.md](PHALA_CONFIG.md) for detailed instructions.
+
+#### Step 2: Verify Deployment
+
+Wait for deployment to complete:
+
+```bash
+phala cvms list
+# Wait for status: running
+```
+
+Get your endpoint URL (format: `https://<APP_ID>-3000.<CLUSTER>.phala.network`)
+
+#### Step 3: Test with Scripts
+
+Run the complete store+access test against your Phala deployment:
+
+```bash
+WULONG_URL=https://your-app-id-3000.dstack-pha-prod9.phala.network pnpm ts-node scripts/test-store-and-access.ts
+```
+
+Expected output:
+
+```
+🧪 Testing ML-KEM store and access flow with SIWE authentication
+
+🔗 Server: https://71ff0e26187be84e21c1f2553dd9dee39e8f7018-3000.dstack-pha-prod9.phala.network
+👤 Test Wallet: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+
+1️⃣  Getting server attestation...
+  ✅ Platform: intel-tdx
+  ✅ ML-KEM Public Key: k3VARNFcS4hWl6AfR0DMylysiyuCqgwO...
+  ⚠️  Measurement: 000000000000000000000000000000...
+
+2️⃣  Generating client ML-KEM keypair...
+  ✅ Generated (1568 bytes)
+
+3️⃣  Encrypting secret for client + server...
+  📝 Plaintext: "🔐 My quantum-safe secret data! Testing store+access flow."
+  ✅ Encrypted with 2 recipients
+
+4️⃣  Storing encrypted secret on server...
+  ✅ Stored in slot: c62d08e957b68109924a63b3879e31caf3f9f9ccd0ab9b42befe082c645eae99
+
+5️⃣  Getting nonce for SIWE authentication...
+  ✅ Nonce: 4fhgr4TAfosNzZI3S
+
+6️⃣  Creating and signing SIWE message...
+  ✅ SIWE message signed
+     Domain: 71ff0e26187be84e21c1f2553dd9dee39e8f7018-3000.dstack-pha-prod9.phala.network
+     Address: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+     Signature: 0xf8db734904dfd0d0b294587ab09901...
+
+7️⃣  Accessing secret (server-side decryption with SIWE)...
+  📝 Server decrypted: "🔐 My quantum-safe secret data! Testing store+access flow."
+  ✅ Match: true
+
+📊 Test Summary:
+  ✅ Server attestation retrieved
+  ✅ Multi-recipient encryption successful
+  ✅ Secret stored on server
+  ✅ SIWE authentication successful
+  ✅ Server-side decryption working
+  ✅ Plaintext matches (end-to-end verified)
+
+🎉 All tests passed! Complete store+access flow working correctly.
+
+📋 What was tested:
+  • ML-KEM-1024 quantum-resistant encryption
+  • Multi-recipient encryption (client + server)
+  • SIWE authentication with ethers wallet
+  • Server-side ML-KEM decryption in TEE
+  • End-to-end data integrity
+```
+
+**Key differences from local testing:**
+- ✅ `platform: "intel-tdx"` (not "none") - Real TEE environment
+- ✅ Hardware-backed ML-KEM private key (sealed in TEE)
+- ✅ Cryptographic attestation from Intel TDX
+- ✅ Production-grade security guarantees
+
+#### Step 4: Verify Attestation
+
+When deployed on Phala, the attestation will include:
+
+```json
+{
+  "platform": "phala",
+  "report": "base64_tee_signature_from_phala...",
+  "measurement": "sha256_hash_of_code...",
+  "timestamp": "2026-03-22T...",
+  "mlkemPublicKey": "server_public_key_from_tee...",
+  "publicKey": "0xPhalaContractAddress..."
+}
+```
+
+**CRITICAL:** Clients MUST verify:
+1. ✅ `measurement` matches published source code hash
+2. ✅ `report` signature is valid (from Phala Network)
+3. ✅ `platform` is "phala"
+
+#### Step 5: Client-Side Verification
+
+```typescript
+import { verifyPhalaAttestation } from 'w3pk'; // Future implementation
+
+const attestation = await fetch('https://your-phala-endpoint/chest/attestation')
+  .then(r => r.json());
+
+// Verify attestation before trusting public key
+const expectedMeasurement = 'sha256_of_published_source_code';
+const isValid = await verifyPhalaAttestation(attestation, expectedMeasurement);
+
+if (!isValid) {
+  throw new Error('❌ TEE attestation verification failed! Do not proceed.');
+}
+
+// Now safe to encrypt with mlkemPublicKey
+const encrypted = await w3pk.mlkemEncrypt(secret, [attestation.mlkemPublicKey]);
+```
+
+#### Step 6: Production Flow
+
+The complete production flow on Phala:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Client gets attestation from Phala TEE                   │
+│    GET https://your-app.phala.network/chest/attestation     │
+│    Response: { platform: "phala", mlkemPublicKey, ... }     │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 2. Client verifies attestation                              │
+│    ✅ Check measurement matches published source code        │
+│    ✅ Verify Phala signature on report                       │
+│    ✅ Confirm TEE platform is genuine                        │
+│    ❌ REJECT if verification fails                           │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Client encrypts with w3pk                                │
+│    const encrypted = await w3pk.mlkemEncrypt(                │
+│      secret,                                                 │
+│      [attestation.mlkemPublicKey]  // Server in TEE         │
+│    );                                                        │
+│    // Client is auto-added as first recipient               │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 4. Client stores encrypted payload                          │
+│    POST /chest/store                                         │
+│    Body: { secret: encrypted, publicAddresses: [...] }      │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 5a. Client decrypts locally (privacy-first!)                │
+│     const plaintext = await w3pk.mlkemDecrypt(encrypted);   │
+│     // NO SERVER INVOLVED - complete privacy                │
+└─────────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 5b. OR: Server decrypts for operations                      │
+│     GET /chest/access/:slot (with SIWE auth)                │
+│     Server uses sealed private key to decrypt               │
+│     Returns plaintext for internal operations               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Testing Checklist
+
+#### Local Testing ✅
+
+- [ ] Generate ML-KEM keypair with `scripts/generate-admin-keypair.ts`
+- [ ] Configure `.env` with generated keys
+- [ ] Start server and verify keys loaded
+- [ ] Run `scripts/test-mlkem-flow.ts` successfully
+- [ ] Run `scripts/test-store-and-access.ts` successfully
+- [ ] Test with w3pk client (if available)
+- [ ] Verify multi-recipient encryption works
+- [ ] Verify both client-side and server-side decryption
+- [ ] Test SIWE authentication flow
+- [ ] Test error cases (wrong key, invalid payload, etc.)
+
+#### Phala Testing ✅
+
+- [ ] Build and push Docker image to Docker Hub
+- [ ] Deploy to Phala Cloud with `phala deploy --interactive`
+- [ ] Verify deployment status with `phala cvms list`
+- [ ] Get attestation and verify `platform: "intel-tdx"`
+- [ ] Verify ML-KEM keys are loaded in TEE
+- [ ] Run `scripts/test-store-and-access.ts` against Phala endpoint
+- [ ] Verify complete store+access flow works
+- [ ] Test SIWE authentication with real wallet
+- [ ] Verify attestation signature (Intel TDX-specific)
+- [ ] Verify measurement matches published code
+- [ ] Test with w3pk client integration
+- [ ] Test with multiple concurrent clients
+- [ ] Monitor instance costs and performance
+
+### Security Considerations
+
+#### Local Development
+
+⚠️ **WARNING:** Local testing does NOT provide TEE security guarantees:
+- Private key is in plaintext `.env` file
+- No hardware isolation
+- No attestation verification
+- Admin can read secrets
+
+**Use local testing ONLY for development and integration testing.**
+
+#### Production (Phala TEE)
+
+✅ **Security Properties:**
+- Private key sealed in TEE hardware (cannot be extracted)
+- Attestation cryptographically proves code integrity
+- Admin cannot access secrets (even with root access)
+- Quantum-resistant encryption (ML-KEM-1024)
+- Multi-recipient design (client can decrypt independently)
+
+**CRITICAL Client Responsibilities:**
+1. **ALWAYS verify attestation** before encrypting
+2. **Check measurement** matches published source code hash
+3. **Verify signature** from Phala Network
+4. **Reject invalid** attestations (do not proceed)
+
+### Troubleshooting
+
+#### "ML-KEM keys not configured"
+
+**Solution:** Run `pnpm ts-node scripts/generate-admin-keypair.ts` and add keys to `.env`
+
+#### "Invalid ML-KEM ciphertext size"
+
+**Cause:** Client encrypted with wrong public key or corrupted payload
+
+**Solution:** Verify client is using `mlkemPublicKey` from `/chest/attestation`
+
+#### "Server public key not found in recipients list"
+
+**Cause:** Client didn't include server as recipient
+
+**Solution:** Pass server's public key to `w3pk.mlkemEncrypt(secret, [serverPublicKey])`
+
+#### "Failed to decrypt secret"
+
+**Possible causes:**
+- Wrong private key on server
+- Corrupted encrypted payload
+- Client used wrong encryption algorithm
+
+**Debug:** Check server logs for detailed error message
 
 ### Test Coverage
 
@@ -434,8 +1003,6 @@ pnpm test:e2e
 - ✅ SIWE authentication
 - ✅ Invalid payload handling
 - ✅ Error cases
-
-See [MLKEM_TESTING_GUIDE.md](MLKEM_TESTING_GUIDE.md) for detailed testing procedures.
 
 ## Migration Guide
 
