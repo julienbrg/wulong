@@ -27,6 +27,8 @@ A NestJS API designed to run inside a Trusted Execution Environment (TEE) with q
 
 ### Local Development (without Docker)
 
+Mock TEE attestation - no real hardware security.
+
 ```bash
 # Install dependencies
 pnpm install
@@ -54,6 +56,8 @@ Access at `https://localhost:3000` (accept self-signed certificate warning)
 
 ### Docker Development
 
+Mock TEE attestation - no real hardware security.
+
 ```bash
 docker compose -f docker-compose.dev.yml up
 ```
@@ -72,35 +76,6 @@ phala deploy --interactive
 # Test against Phala deployment
 WULONG_URL=https://your-app-id-3000.phala.network pnpm test:store-access
 ```
-
-## Modes
-
-Wulong can run in four different modes:
-
-1. **[Local (without Docker)](docs/LOCAL_SETUP.md)** - Best for development and debugging
-   - Hot reload with `pnpm start:dev`
-   - HTTPS with self-signed certificates
-   - Direct access to logs and debugging tools
-   - Mock TEE attestation (no real hardware security)
-
-2. **[Local (with Docker)](docs/DOCKER.md)** - Best for testing deployment configurations
-   - Development mode with volume mounting and hot reload
-   - Production mode with optimized multi-stage builds
-   - Consistent environment across different machines
-   - Mock TEE attestation (no real hardware security)
-
-3. **Standard (without TEE)** - Classic VPS deployment (e.g., Ubuntu on Infomaniak)
-   - Deploy with PM2 on standard cloud infrastructure
-   - No hardware attestation (`platform: "none"`)
-   - Suitable when TEE guarantees are not required
-   - Standard production setup with HTTPS reverse proxy
-
-4. **[Phala Cloud (TEE)](docs/PHALA_CONFIG.md)** - Production with hardware-backed security (recommended)
-   - Intel TDX Trusted Execution Environment
-   - End-to-end encrypted secrets
-   - Full attestation support (`platform: "intel-tdx"`)
-   - TLS termination by Phala
-   - Cryptographic proof of code integrity
 
 ## Docs
 
